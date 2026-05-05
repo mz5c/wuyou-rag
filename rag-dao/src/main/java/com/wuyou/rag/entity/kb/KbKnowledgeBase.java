@@ -23,7 +23,7 @@ public class KbKnowledgeBase implements Serializable {
 
     private String description;
 
-    private Integer status;
+    private Integer status = 1;
 
     private Long createBy;
 

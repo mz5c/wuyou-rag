@@ -25,9 +25,9 @@ public class SysUser implements Serializable {
 
     private String nickname;
 
-    private String role;
+    private String role = "USER";
 
-    private Integer status;
+    private Integer status = 1;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;

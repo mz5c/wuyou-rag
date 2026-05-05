@@ -20,11 +20,11 @@ public class KbConversation implements Serializable {
 
     private Long userId;
 
-    private String title;
+    private String title = "新对话";
 
     private Long kbId;
 
-    private Integer messageCount;
+    private Integer messageCount = 0;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;

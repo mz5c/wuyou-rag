@@ -26,7 +26,7 @@ public class KbChatHistory implements Serializable {
 
     private String answer;
 
-    private String answerType;
+    private String answerType = "llm";
 
     private String usedChunkIds;
 

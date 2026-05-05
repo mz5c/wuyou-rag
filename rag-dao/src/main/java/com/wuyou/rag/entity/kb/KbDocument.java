@@ -29,9 +29,9 @@ public class KbDocument implements Serializable {
 
     private Long fileSize;
 
-    private Integer chunkCount;
+    private Integer chunkCount = 0;
 
-    private Integer status;
+    private Integer status = 0;
 
     private String errorMsg;
 
