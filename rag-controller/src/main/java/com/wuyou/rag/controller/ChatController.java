@@ -1,6 +1,7 @@
 package com.wuyou.rag.controller;
 
 import com.wuyou.rag.chat.ChatService;
+import com.wuyou.rag.chat.StreamingChatService;
 import com.wuyou.rag.entity.kb.KbConversation;
 import com.wuyou.rag.result.Result;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -29,6 +32,7 @@ import java.util.List;
 public class ChatController {
 
     private final ChatService chatService;
+    private final StreamingChatService streamingChatService;
     private final HttpServletRequest httpServletRequest;
 
     @PostMapping
@@ -66,6 +70,15 @@ public class ChatController {
     @PostMapping("/feedback")
     public Result<Void> feedback(@RequestBody @Valid FeedbackRequest request) {
         return chatService.feedback(request.getHistoryId(), request.getFeedback(), request.getComment());
+    }
+
+    // ---- SSE Streaming ----
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@RequestParam(required = false) Long conversationId,
+                             @RequestParam String question,
+                             @AuthenticationPrincipal Long userId) {
+        return streamingChatService.streamChat(userId, conversationId, question);
     }
 
     // ---- DTOs ----
