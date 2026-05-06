@@ -33,3 +33,9 @@ mybatis-plus:
 jwt:
   secret: d2VicHJvdGVjdC1yYWctc2VjcmV0LWtleS0yMDI0LXd5cmFnLXNlY3JldA==
   expiration-ms: 86400000
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: wy-rag-docs
