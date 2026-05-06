@@ -9,8 +9,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -33,9 +37,6 @@ public class JwtTokenProvider {
         this.redisTemplate = redisTemplate;
     }
 
-    /**
-     * Generate JWT token with userId, username, and role claims.
-     */
     public String generateToken(Long userId, String username, String role) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationMs);
@@ -50,9 +51,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    /**
-     * Parse and return claims from a JWT token.
-     */
     public Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(secretKey)
@@ -62,51 +60,51 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Validate token: check blacklist in Redis first, then verify signature and expiration.
+     * Validate token and return claims atomically (single parse).
      */
-    public boolean validateToken(String token) {
+    public Optional<Claims> validateAndParse(String token) {
         try {
-            String blacklistKey = BLACKLIST_PREFIX + token;
-            Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
-            if (Boolean.TRUE.equals(isBlacklisted)) {
+            String blacklistKey = BLACKLIST_PREFIX + hashToken(token);
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(blacklistKey))) {
                 log.warn("Token is blacklisted");
-                return false;
+                return Optional.empty();
             }
-            parseToken(token);
-            return true;
+            return Optional.of(parseToken(token));
         } catch (Exception e) {
             log.error("Token validation failed: {}", e.getMessage());
-            return false;
+            return Optional.empty();
         }
     }
 
     /**
-     * Add token to Redis blacklist with the given TTL.
+     * Add token to Redis blacklist. TTL is derived from the token's remaining expiration.
      */
-    public void blacklistToken(String token, long expirationMs) {
-        String blacklistKey = BLACKLIST_PREFIX + token;
-        redisTemplate.opsForValue().set(blacklistKey, "1", expirationMs, TimeUnit.MILLISECONDS);
-        log.info("Token blacklisted");
+    public void blacklistToken(String token) {
+        try {
+            Claims claims = parseToken(token);
+            long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
+            if (remainingMs <= 0) {
+                return;
+            }
+            String blacklistKey = BLACKLIST_PREFIX + hashToken(token);
+            redisTemplate.opsForValue().set(blacklistKey, "1", remainingMs, TimeUnit.MILLISECONDS);
+            log.info("Token blacklisted for {} ms", remainingMs);
+        } catch (Exception e) {
+            log.warn("Could not blacklist token: {}", e.getMessage());
+        }
     }
 
-    /**
-     * Extract userId claim from token.
-     */
-    public Long getUserIdFromToken(String token) {
-        return parseToken(token).get("userId", Long.class);
-    }
-
-    /**
-     * Extract username (subject) from token.
-     */
-    public String getUsernameFromToken(String token) {
-        return parseToken(token).getSubject();
-    }
-
-    /**
-     * Extract role claim from token.
-     */
-    public String getRoleFromToken(String token) {
-        return parseToken(token).get("role", String.class);
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                hexString.append(String.format("%02x", b));
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.wuyou.rag.config;
 
 import com.wuyou.rag.auth.JwtTokenProvider;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,21 +31,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String token = extractToken(request);
 
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            Long userId = jwtTokenProvider.getUserIdFromToken(token);
-            String username = jwtTokenProvider.getUsernameFromToken(token);
-            String role = jwtTokenProvider.getRoleFromToken(token);
+        if (StringUtils.hasText(token)) {
+            jwtTokenProvider.validateAndParse(token).ifPresent(claims -> {
+                Long userId = claims.get("userId", Long.class);
+                String username = claims.getSubject();
+                String role = claims.get("role", String.class);
 
-            List<SimpleGrantedAuthority> authorities = List.of(
-                    new SimpleGrantedAuthority("ROLE_" + role)
-            );
+                List<SimpleGrantedAuthority> authorities = List.of(
+                        new SimpleGrantedAuthority("ROLE_" + role)
+                );
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
-            authentication.setDetails(username);
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("Authenticated user: {} with role: {}", username, role);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug("Authenticated user: {} with role: {}", username, role);
+            });
         }
 
         chain.doFilter(request, response);
