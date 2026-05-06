@@ -10,9 +10,11 @@ import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.result.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -65,22 +67,28 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> register(String username, String password, String nickname, Long operatorId) {
-        Long count = sysUserMapper.selectCount(
-                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username));
-        if (count > 0) {
-            throw new BizException(ErrorCode.PARAM_ERROR, "用户名已存在");
+        try {
+            Long count = sysUserMapper.selectCount(
+                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username));
+            if (count > 0) {
+                return Result.fail(ErrorCode.PARAM_ERROR.getCode(), "用户名已存在");
+            }
+
+            SysUser user = new SysUser();
+            user.setUsername(username);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setNickname(nickname != null ? nickname : username);
+            user.setRole("USER");
+            user.setStatus(1);
+            sysUserMapper.insert(user);
+
+            log.info("User registered: username={}, operatorId={}", username, operatorId);
+            return Result.success(null);
+        } catch (DuplicateKeyException e) {
+            log.warn("Concurrent registration attempt for username: {}", username);
+            return Result.fail(ErrorCode.PARAM_ERROR.getCode(), "用户名已存在");
         }
-
-        SysUser user = new SysUser();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
-        user.setNickname(nickname != null ? nickname : username);
-        user.setRole("USER");
-        user.setStatus(1);
-        sysUserMapper.insert(user);
-
-        log.info("User registered: username={}, operatorId={}", username, operatorId);
-        return Result.success(null);
     }
 }

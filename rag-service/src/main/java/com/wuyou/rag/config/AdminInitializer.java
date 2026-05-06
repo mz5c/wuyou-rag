@@ -5,6 +5,7 @@ import com.wuyou.rag.entity.sys.SysUser;
 import com.wuyou.rag.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,9 @@ public class AdminInitializer implements ApplicationRunner {
     private final SysUserMapper sysUserMapper;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${app.admin.default-password:wuyou}")
+    private String defaultPassword;
+
     @Override
     public void run(ApplicationArguments args) {
         Long adminCount = sysUserMapper.selectCount(
@@ -29,7 +33,7 @@ public class AdminInitializer implements ApplicationRunner {
 
         SysUser admin = new SysUser();
         admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("wuyou"));
+        admin.setPassword(passwordEncoder.encode(defaultPassword));
         admin.setNickname("系统管理员");
         admin.setRole("ADMIN");
         admin.setStatus(1);
