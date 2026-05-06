@@ -76,3 +76,9 @@ progress.md
 *.bak
 
 RAG.md
+# Node
+node_modules/
+npm-debug.log*
+
+# Frontend build output
+rag-frontend/dist/
