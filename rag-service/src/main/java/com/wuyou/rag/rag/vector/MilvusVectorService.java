@@ -55,6 +55,8 @@ public class MilvusVectorService implements VectorService {
 
         ConnectConfig config = ConnectConfig.builder()
                 .uri(host + ":" + port)
+                .username("root")
+                .password("Milvus")
                 .build();
         client = new MilvusClientV2(config);
 
