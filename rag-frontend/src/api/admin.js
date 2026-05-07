@@ -9,7 +9,7 @@ export function getAuditLogs(params) {
 }
 
 export function getConfigs() {
-  return request.get('/api/v1/admin/configs')
+  return request.get('/api/v1/admin/config')
 }
 
 export function updateConfig(data) {
@@ -21,5 +21,5 @@ export function getUsers(params) {
 }
 
 export function updateUser(id, data) {
-  return request.put(`/api/v1/admin/user/${id}`, data)
+  return request.put(`/api/v1/admin/users/${id}`, data)
 }

@@ -9,7 +9,7 @@ export function logout() {
 }
 
 export function getUserInfo() {
-  return request.get('/api/v1/auth/user-info')
+  return request.get('/api/v1/auth/userinfo')
 }
 
 export function register(data) {
