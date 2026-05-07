@@ -1,8 +1,8 @@
 -- =====================================================
 -- 企业级RAG智能知识库 - 数据库初始化脚本
 -- =====================================================
-CREATE DATABASE IF NOT EXISTS `wy-rag` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `wy-rag`;
+CREATE DATABASE IF NOT EXISTS `wy_rag` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `wy_rag`;
 
 -- 用户表（Spring Security）
 CREATE TABLE IF NOT EXISTS sys_user (
