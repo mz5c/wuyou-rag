@@ -49,7 +49,7 @@ public class ChatController {
         return chatService.createConversation(userId, request.getTitle(), request.getKbId());
     }
 
-    @GetMapping("/conversation")
+    @GetMapping("/conversations")
     public Result<List<KbConversation>> listConversations(@AuthenticationPrincipal Long userId) {
         return chatService.listConversations(userId);
     }

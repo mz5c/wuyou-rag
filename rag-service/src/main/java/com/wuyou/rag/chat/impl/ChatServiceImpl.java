@@ -23,6 +23,7 @@ import com.wuyou.rag.mapper.KbConversationMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.rag.embedding.BgeEmbeddingService;
+import com.wuyou.rag.rag.llm.LlmService;
 import com.wuyou.rag.rag.llm.QwenLlmService;
 import com.wuyou.rag.rag.prompt.PromptBuilder;
 import com.wuyou.rag.rag.vector.MilvusVectorService;
@@ -38,6 +39,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -186,13 +188,21 @@ public class ChatServiceImpl implements ChatService {
                 sources.add(new SourceDoc(chunkId, chunk.getChunkContent(), docTitle, docUrl));
             }
 
-            // 6. Build prompt
-            String prompt = promptBuilder.buildPrompt(question, contextChunks);
+            // 6. Get conversation history (last N rounds)
+            List<KbChatHistory> chatHistory = chatHistoryMapper.selectList(
+                    Wrappers.<KbChatHistory>lambdaQuery()
+                            .eq(KbChatHistory::getConversationId, conversationId)
+                            .orderByDesc(KbChatHistory::getCreateTime)
+                            .last("LIMIT 20"));
+            Collections.reverse(chatHistory);
 
-            // 7. LLM call
-            String answer = llmService.chat(prompt);
+            // 7. Build messages with history
+            List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
-            // 8. Save chat history and update conversation
+            // 8. LLM call
+            String answer = llmService.chat(messages);
+
+            // 9. Save chat history and update conversation
             long elapsed = System.currentTimeMillis() - startTime;
 
             String usedChunkIds = chunkIds.stream()
@@ -227,19 +237,19 @@ public class ChatServiceImpl implements ChatService {
                 conversationMapper.updateById(conversation);
             }
 
-            // 9. Cache hot QA (skip fallback error messages)
+            // 10. Cache hot QA (skip fallback error messages)
             if (!answer.contains(FALLBACK_ANSWER)) {
                 long cacheTtl = getCacheTtl();
                 redisTemplate.opsForValue().set(cacheKey, answer, cacheTtl, TimeUnit.SECONDS);
                 log.debug("Cached QA response: key={}, ttl={}s", cacheKey, cacheTtl);
             }
 
-            // 10. Audit log
+            // 11. Audit log
             String username = getUsername(userId);
             String detail = "对话ID: " + conversationId + ", 问题长度: " + question.length();
             auditLogService.log(userId, username, "CHAT", detail, ip, userAgent);
 
-            // 11. Return response
+            // 12. Return response
             ChatResponse response = new ChatResponse(
                     conversationId, history.getId(), answer, sources, (int) elapsed);
             return Result.success(response);

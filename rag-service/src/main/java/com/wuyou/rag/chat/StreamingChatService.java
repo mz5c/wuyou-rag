@@ -15,9 +15,12 @@ import com.wuyou.rag.mapper.KbConfigMapper;
 import com.wuyou.rag.mapper.KbConversationMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.rag.embedding.BgeEmbeddingService;
+import com.wuyou.rag.rag.llm.LlmService;
 import com.wuyou.rag.rag.llm.QwenLlmService;
 import com.wuyou.rag.rag.prompt.PromptBuilder;
 import com.wuyou.rag.rag.vector.MilvusVectorService;
+import com.wuyou.rag.exception.BizException;
+import com.wuyou.rag.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -119,13 +123,21 @@ public class StreamingChatService {
                         .name("sources")
                         .data(sourcesJson));
 
-                // 7. Build prompt
-                String prompt = promptBuilder.buildPrompt(question, contextChunks);
+                // 7. Get conversation history (last N rounds)
+                List<KbChatHistory> chatHistory = chatHistoryMapper.selectList(
+                        Wrappers.<KbChatHistory>lambdaQuery()
+                                .eq(KbChatHistory::getConversationId, resolvedConversationId)
+                                .orderByDesc(KbChatHistory::getCreateTime)
+                                .last("LIMIT 20"));
+                Collections.reverse(chatHistory);
 
-                // 8. LLM call (non-streaming for now, simulate token streaming)
-                String fullAnswer = llmService.chat(prompt);
+                // 8. Build messages with history
+                List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
-                // 9. Stream answer token by token
+                // 9. LLM call (non-streaming for now, simulate token streaming)
+                String fullAnswer = llmService.chat(messages);
+
+                // 10. Stream answer token by token
                 for (char c : fullAnswer.toCharArray()) {
                     emitter.send(SseEmitter.event()
                             .name("token")
@@ -133,13 +145,13 @@ public class StreamingChatService {
                     Thread.sleep(TOKEN_DELAY_MS);
                 }
 
-                // 10. Send done event with elapsed time
+                // 11. Send done event with elapsed time
                 long elapsed = System.currentTimeMillis() - startTime;
                 emitter.send(SseEmitter.event()
                         .name("done")
                         .data("{\"elapsedMs\": " + elapsed + "}"));
 
-                // 11. Save chat history
+                // 12. Save chat history
                 String usedChunkIds = chunkIds.stream()
                         .map(String::valueOf)
                         .collect(Collectors.joining(","));
@@ -164,7 +176,7 @@ public class StreamingChatService {
                     conversationMapper.updateById(conv);
                 }
 
-                // 12. Cache hot QA (skip fallback error messages)
+                // 13. Cache hot QA (skip fallback error messages)
                 if (!fullAnswer.contains(FALLBACK_ANSWER)) {
                     long cacheTtl = getCacheTtl();
                     String cacheKey = CACHE_KEY_PREFIX + md5Hex(question);
@@ -172,7 +184,7 @@ public class StreamingChatService {
                     log.debug("Cached streaming QA response: key={}, ttl={}s", cacheKey, cacheTtl);
                 }
 
-                // 13. Audit log
+                // 14. Audit log
                 String ip = httpServletRequest.getRemoteAddr();
                 String userAgent = httpServletRequest.getHeader("User-Agent");
                 String detail = "对话ID: " + resolvedConversationId + ", 问题长度: " + question.length();
@@ -217,10 +229,10 @@ public class StreamingChatService {
 
         KbConversation conversation = conversationMapper.selectById(conversationId);
         if (conversation == null) {
-            throw new IllegalArgumentException("对话不存在");
+            throw new BizException(ErrorCode.NOT_FOUND, "对话不存在");
         }
         if (!conversation.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权访问此对话");
+            throw new BizException(ErrorCode.FORBIDDEN, "无权访问此对话");
         }
         return conversationId;
     }

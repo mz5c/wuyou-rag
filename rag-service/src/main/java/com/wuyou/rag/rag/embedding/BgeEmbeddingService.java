@@ -1,5 +1,7 @@
 package com.wuyou.rag.rag.embedding;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wuyou.rag.entity.kb.KbConfig;
 import com.wuyou.rag.exception.BizException;
@@ -15,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,22 +35,30 @@ public class BgeEmbeddingService implements EmbeddingService {
     @Override
     public float[] embed(String text) {
         String url = getApiUrl();
-        Map<String, Object> body = new HashMap<>();
+        JSONObject body = new JSONObject();
         body.put("texts", Collections.singletonList(text));
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            HttpEntity<Map<String, Object>> entity =
-                    new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            List<List<Float>> embeddings = (List<List<Float>>) response.getBody().get("embeddings");
-            List<Float> floats = embeddings.get(0);
+            HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
+            ResponseEntity<JSONObject> response = restTemplate.postForEntity(url, entity, JSONObject.class);
+            JSONObject respBody = response.getBody();
+            if (respBody == null) {
+                throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service returned empty body");
+            }
+            JSONArray embeddings = respBody.getJSONArray("embeddings");
+            if (embeddings == null || embeddings.isEmpty()) {
+                throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service returned empty embeddings");
+            }
+            JSONArray floats = embeddings.getJSONArray(0);
             float[] vector = new float[floats.size()];
             for (int i = 0; i < floats.size(); i++) {
-                vector[i] = floats.get(i);
+                vector[i] = floats.getFloatValue(i);
             }
             return vector;
+        } catch (BizException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Embedding API call failed: url={}", url, e);
             throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service unavailable");
@@ -59,48 +68,37 @@ public class BgeEmbeddingService implements EmbeddingService {
     @Override
     public List<float[]> embed(List<String> texts) {
         String url = getApiUrl();
-        Map<String, Object> body = new HashMap<>();
+        JSONObject body = new JSONObject();
         body.put("texts", texts);
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            HttpEntity<Map<String, Object>> entity =
-                    new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            List<List<Float>> embeddings = (List<List<Float>>) response.getBody().get("embeddings");
-            List<float[]> list =new ArrayList<>();
-            for (List<Float> embedding : embeddings) {
+            HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
+            ResponseEntity<JSONObject> response = restTemplate.postForEntity(url, entity, JSONObject.class);
+            JSONObject respBody = response.getBody();
+            if (respBody == null) {
+                throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service returned empty body");
+            }
+            JSONArray embeddings = respBody.getJSONArray("embeddings");
+            if (embeddings == null || embeddings.isEmpty()) {
+                throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service returned empty embeddings");
+            }
+            List<float[]> list = new ArrayList<>();
+            for (int i = 0; i < embeddings.size(); i++) {
+                JSONArray embedding = embeddings.getJSONArray(i);
                 float[] vector = new float[embedding.size()];
-                for (int i = 0; i < embedding.size(); i++) {
-                    vector[i] = embedding.get(i);
+                for (int j = 0; j < embedding.size(); j++) {
+                    vector[j] = embedding.getFloatValue(j);
                 }
                 list.add(vector);
             }
             return list;
+        } catch (BizException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Embedding API call failed: url={}", url, e);
             throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "Embedding service unavailable");
         }
-    }
-
-    public static void main(String[] args) {
-        RestTemplate rt = new RestTemplate();
-        String url = "http://localhost:5001/embed";
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("texts", Arrays.asList("xxx", "yyy"));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
-        ResponseEntity<Map> response = rt.postForEntity(url, entity, Map.class);
-
-        // FastAPI 返回的是 embeddings，不是 vector
-        List<List<Float>> embeddings = (List<List<Float>>) response.getBody().get("embeddings");
-
-        System.out.println(embeddings);
     }
 }

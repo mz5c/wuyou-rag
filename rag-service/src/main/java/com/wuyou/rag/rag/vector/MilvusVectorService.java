@@ -54,7 +54,7 @@ public class MilvusVectorService implements VectorService {
         int port = portConfig != null ? Integer.parseInt(portConfig.getConfigValue()) : 19530;
 
         ConnectConfig config = ConnectConfig.builder()
-                .uri(host + ":" + port)
+                .uri("http://" + host + ":" + port)
                 .username("root")
                 .password("Milvus")
                 .build();

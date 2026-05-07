@@ -75,3 +75,8 @@ resilience4j:
     instances:
       llmService:
         base-config: default
+
+llm:
+  api-url: ${WY_LLM_API_URL}
+  api-key: ${WY_LLM_API_KEY}
+  model-name: ${WY_LLM_API_MODEL}

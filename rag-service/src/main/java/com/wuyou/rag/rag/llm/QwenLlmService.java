@@ -1,22 +1,23 @@
 package com.wuyou.rag.rag.llm;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.wuyou.rag.entity.kb.KbConfig;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.wuyou.rag.exception.BizException;
 import com.wuyou.rag.exception.ErrorCode;
-import com.wuyou.rag.mapper.KbConfigMapper;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -24,59 +25,55 @@ import java.util.Map;
 public class QwenLlmService implements LlmService {
 
     private final RestTemplate restTemplate;
-    private final KbConfigMapper kbConfigMapper;
 
-    private String getApiUrl() {
-        KbConfig config = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "llm.api_url"));
-        return config != null ? config.getConfigValue() : "http://localhost:8000/v1";
-    }
+    @Value("${llm.api-url}")
+    private String llmApiUrl;
 
-    private String getModelName() {
-        KbConfig config = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "llm.model_name"));
-        return config != null ? config.getConfigValue() : "qwen";
-    }
+    @Value("${llm.model-name}")
+    private String llmModelName;
 
-    private double getTemperature() {
-        KbConfig config = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "llm.temperature"));
-        return config != null ? Double.parseDouble(config.getConfigValue()) : 0.7;
-    }
-
-    @SuppressWarnings("unused")
-    private int getTimeout() {
-        KbConfig config = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "llm.timeout"));
-        return config != null ? Integer.parseInt(config.getConfigValue()) : 30000;
-    }
+    @Value("${llm.api-key}")
+    private String llmApiKey;
 
     @Override
     @CircuitBreaker(name = "llmService", fallbackMethod = "chatFallback")
     @RateLimiter(name = "llmService")
     @Retry(name = "llmService")
-    public String chat(String prompt) {
-        String url = getApiUrl() + "/chat/completions";
+    public String chat(List<Message> messages) {
+        String url = llmApiUrl;
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", getModelName());
-        requestBody.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-        requestBody.put("temperature", getTemperature());
+        JSONArray messagesArray = new JSONArray();
+        for (Message msg : messages) {
+            JSONObject msgObj = new JSONObject();
+            msgObj.put("role", msg.role());
+            msgObj.put("content", msg.content());
+            messagesArray.add(msgObj);
+        }
 
-        log.info("Calling LLM: url={}, model={}", url, getModelName());
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("model", llmModelName);
+        requestBody.put("messages", messagesArray);
 
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, requestBody, Map.class);
-        Map body = response.getBody();
+        log.info("Calling LLM: url={}, model={}, messageCount={}", url, llmModelName, messages.size());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + llmApiKey);
+
+        HttpEntity<String> entity = new HttpEntity<>(requestBody.toJSONString(), headers);
+        ResponseEntity<JSONObject> response = restTemplate.postForEntity(url, entity, JSONObject.class);
+        JSONObject body = response.getBody();
 
         if (body == null) {
             throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "LLM返回为空");
         }
 
-        List<Map> choices = (List<Map>) body.get("choices");
+        JSONArray choices = body.getJSONArray("choices");
         if (choices != null && !choices.isEmpty()) {
-            Map message = (Map) choices.get(0).get("message");
+            JSONObject firstChoice = choices.getJSONObject(0);
+            JSONObject message = firstChoice.getJSONObject("message");
             if (message != null) {
-                String content = (String) message.get("content");
+                String content = message.getString("content");
                 if (content != null) {
                     return content;
                 }
@@ -87,7 +84,7 @@ public class QwenLlmService implements LlmService {
     }
 
     @SuppressWarnings("unused")
-    public String chatFallback(String prompt, Throwable t) {
+    public String chatFallback(List<Message> messages, Throwable t) {
         log.error("LLM call failed after retries: {}", t.getMessage());
         return "抱歉，AI 服务暂时不可用，请稍后再试。";
     }
