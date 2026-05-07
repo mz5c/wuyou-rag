@@ -72,12 +72,10 @@ public class DocumentProcessConsumer {
             // Process each chunk: embed and persist
             List<KbChunk> chunkEntities = new ArrayList<>();
             List<Long> chunkIds = new ArrayList<>();
-            List<float[]> vectors = new ArrayList<>();
+            List<String> contents = new ArrayList<>();
 
             for (ChunkResult chunk : chunks) {
-                // Embed chunk content
-                float[] vector = embeddingService.embed(chunk.content());
-                vectors.add(vector);
+                contents.add(chunk.content());
 
                 // Insert chunk entity to kb_chunk table
                 KbChunk chunkEntity = new KbChunk();
@@ -90,6 +88,9 @@ public class DocumentProcessConsumer {
                 chunkIds.add(chunkEntity.getId());
                 chunkEntities.add(chunkEntity);
             }
+
+            // Embed chunk contents
+            List<float[]> vectors = embeddingService.embed(contents);
 
             // Batch insert vectors to Milvus
             vectorService.insertVectors(chunkIds, vectors);
