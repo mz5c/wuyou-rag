@@ -1,5 +1,6 @@
 <template>
   <button
+    type="button"
     :class="[
       'w-button',
       `w-button--${variant}`,
@@ -7,6 +8,7 @@
       { 'w-button--loading': loading, 'w-button--block': block }
     ]"
     :disabled="disabled || loading"
+    :aria-busy="loading ? 'true' : undefined"
     @click="$emit('click', $event)"
   >
     <span v-if="loading" class="w-button__spinner">
@@ -39,7 +41,11 @@ defineEmits(['click'])
   font-family: var(--font-body);
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: opacity var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
   white-space: nowrap;
   user-select: none;
   outline: none;
