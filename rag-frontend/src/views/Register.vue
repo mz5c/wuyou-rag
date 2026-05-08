@@ -6,7 +6,7 @@
           <div class="register-brand__logo-icon">W</div>
           <span>Wuyou RAG</span>
         </div>
-        <h1 class="register-brand__title">企业级智能知识库</h1>
+        <h1 class="register-brand__title">内部智能知识库</h1>
         <p class="register-brand__desc">基于 RAG 技术，让您的文档资产<br>转化为可对话的智慧</p>
         <p class="register-brand__copyright">&copy; 2026 Wuyou RAG</p>
       </div>
