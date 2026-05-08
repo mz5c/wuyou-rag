@@ -74,4 +74,11 @@
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Legacy aliases (remove after page rewrites) ── */
+  --color-accent: var(--color-primary-600);
+  --color-accent-hover: var(--color-primary-500);
+  --color-accent-light: var(--color-primary-50);
+  --color-sidebar-active-bg: var(--color-sidebar-active);
+  --color-sidebar-active-text: var(--color-primary-300);
 }
