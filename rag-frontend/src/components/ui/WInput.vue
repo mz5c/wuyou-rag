@@ -12,7 +12,7 @@
         @input="$emit('update:modelValue', $event.target.value)"
         @blur="$emit('blur', $event)"
       />
-      <button v-if="clearable && modelValue" type="button" class="w-input__clear" @click="$emit('update:modelValue', '')">
+      <button v-if="clearable && (modelValue !== '' && modelValue != null)" type="button" class="w-input__clear" aria-label="清除" @click="$emit('update:modelValue', '')">
         <WIcon name="close" size="14" />
       </button>
     </div>

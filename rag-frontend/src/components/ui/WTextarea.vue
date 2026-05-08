@@ -42,6 +42,7 @@ defineEmits(['update:modelValue'])
               box-shadow var(--duration-fast) var(--ease-out);
 }
 .w-textarea::placeholder { color: var(--color-text-muted); }
+.w-textarea:hover { border-color: var(--color-primary-300); }
 .w-textarea:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
 .w-textarea-wrapper--error .w-textarea { border-color: var(--color-danger); }
 .w-textarea:disabled { color: var(--color-text-muted); cursor: not-allowed; background: var(--color-bg); }
