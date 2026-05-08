@@ -2,6 +2,11 @@
   <div class="users-page">
     <h2 class="page-title">用户管理</h2>
 
+    <div class="section-header">
+      <h3 class="section-title">用户列表</h3>
+      <el-button type="primary" size="small" @click="openCreateDialog">新增用户</el-button>
+    </div>
+
     <el-card shadow="never">
       <el-table :data="users" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="username" label="用户名" width="150" />
@@ -79,13 +84,38 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Create User Dialog -->
+    <el-dialog v-model="createDialogVisible" title="新增用户" width="460px">
+      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-position="top">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="createForm.username" placeholder="2-32位字母、数字或下划线" />
+        </el-form-item>
+        <el-form-item label="昵称" prop="nickname">
+          <el-input v-model="createForm.nickname" placeholder="请输入昵称" />
+        </el-form-item>
+        <el-form-item label="密码" prop="password">
+          <el-input v-model="createForm.password" type="password" show-password placeholder="6-32位密码" />
+        </el-form-item>
+        <el-form-item label="角色" prop="role">
+          <el-select v-model="createForm.role" style="width:100%">
+            <el-option label="普通用户" value="USER" />
+            <el-option label="管理员" value="ADMIN" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="handleCreateUser">创建</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getUsers, updateUser } from '../../api/admin'
+import { getUsers, updateUser, createUser } from '../../api/admin'
 
 const users = ref([])
 const loading = ref(false)
@@ -103,6 +133,27 @@ const editForm = reactive({
   statusActive: true,
   password: ''
 })
+
+const createDialogVisible = ref(false)
+const creating = ref(false)
+const createFormRef = ref(null)
+const createForm = reactive({
+  username: '',
+  nickname: '',
+  password: '',
+  role: 'USER'
+})
+const createRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 32, message: '用户名长度为2-32位', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 32, message: '密码长度为6-32位', trigger: 'blur' }
+  ]
+}
 
 onMounted(() => {
   loadUsers()
@@ -154,6 +205,30 @@ async function handleSaveUser() {
     saving.value = false
   }
 }
+
+function openCreateDialog() {
+  createForm.username = ''
+  createForm.nickname = ''
+  createForm.password = ''
+  createForm.role = 'USER'
+  createDialogVisible.value = true
+}
+
+async function handleCreateUser() {
+  const valid = await createFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  creating.value = true
+  try {
+    await createUser({ ...createForm })
+    ElMessage.success('用户已创建')
+    createDialogVisible.value = false
+    await loadUsers()
+  } catch {
+    // error handled by interceptor
+  } finally {
+    creating.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -165,6 +240,19 @@ async function handleSaveUser() {
   font-size: 20px;
   color: #303133;
   margin: 0 0 24px 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  color: #303133;
+  margin: 0;
 }
 
 .pagination-wrapper {

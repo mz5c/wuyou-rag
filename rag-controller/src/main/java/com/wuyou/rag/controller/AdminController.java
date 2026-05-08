@@ -24,6 +24,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -113,6 +114,25 @@ public class AdminController {
         return Result.success(null);
     }
 
+    @PostMapping("/users")
+    public Result<?> createUser(@RequestBody @Valid CreateUserRequest request) {
+        SysUser existing = sysUserMapper.selectOne(
+                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, request.getUsername()));
+        if (existing != null) {
+            return Result.fail(ErrorCode.PARAM_ERROR.getCode(), "用户名已存在");
+        }
+        SysUser user = new SysUser();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setNickname(request.getNickname());
+        user.setRole(request.getRole() != null ? request.getRole() : "USER");
+        user.setStatus(1);
+        user.setCreateTime(LocalDateTime.now());
+        user.setUpdateTime(LocalDateTime.now());
+        sysUserMapper.insert(user);
+        return Result.success(user);
+    }
+
     // ---- DTOs ----
 
     @Data
@@ -138,5 +158,17 @@ public class AdminController {
         private String role;
         private Integer status;
         private String password;
+    }
+
+    @Data
+    public static class CreateUserRequest {
+        @NotBlank(message = "用户名不能为空")
+        private String username;
+
+        @NotBlank(message = "密码不能为空")
+        private String password;
+
+        private String nickname;
+        private String role;
     }
 }

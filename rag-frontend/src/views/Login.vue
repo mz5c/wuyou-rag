@@ -41,6 +41,7 @@
         </el-form-item>
       </el-form>
       <div v-if="errorMsg" class="login-error">{{ errorMsg }}</div>
+      <p class="auth-link">没有账号？<router-link to="/register">立即注册</router-link></p>
     </div>
   </div>
 </template>
@@ -137,4 +138,7 @@ async function handleLogin() {
   text-align: center;
   margin-top: 12px;
 }
+.auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #64748b; }
+.auth-link a { color: #2563eb; text-decoration: none; }
+.auth-link a:hover { text-decoration: underline; }
 </style>

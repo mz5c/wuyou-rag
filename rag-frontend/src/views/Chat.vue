@@ -20,7 +20,19 @@
             :index="String(conv.id || conv.conversationId)"
           >
             <el-icon><ChatDotSquare /></el-icon>
-            <span>{{ conv.title || conv.topic || '新对话' }}</span>
+            <div class="conv-title-wrapper">
+              <span v-if="editingConvId !== conv.id" @dblclick="startEditTitle(conv)" class="conv-title">{{ conv.title || conv.topic || '新对话' }}</span>
+              <el-input
+                v-else
+                v-model="editTitleText"
+                size="small"
+                @blur="saveEditTitle(conv)"
+                @keyup.enter="saveEditTitle(conv)"
+                ref="titleInputRef"
+                maxlength="100"
+              />
+              <el-icon class="edit-icon" @click="startEditTitle(conv)"><Edit /></el-icon>
+            </div>
             <el-icon
               class="delete-btn"
               @click.stop="handleDeleteConversation(conv.id || conv.conversationId)"
@@ -95,14 +107,14 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Plus, ChatDotSquare, Delete, Setting, SwitchButton,
-  Promotion, ChatLineSquare
+  Promotion, ChatLineSquare, Edit
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatMessage from '../components/ChatMessage.vue'
 import SourceReference from '../components/SourceReference.vue'
 import {
   chat, getMessages, listConversations,
-  deleteConversation, createConversation
+  deleteConversation, createConversation, updateConversationTitle
 } from '../api/chat'
 import { useAuth } from '../store/auth'
 
@@ -115,6 +127,10 @@ const messages = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
 const streaming = ref(false)
+
+const editingConvId = ref(null)
+const editTitleText = ref('')
+const titleInputRef = ref(null)
 
 onMounted(() => {
   loadConversations()
@@ -141,9 +157,20 @@ async function switchConversation(id) {
   activeConversationId.value = id
   messages.value = []
   try {
-    const res = await getMessages(id)
-    const list = res.data?.data || res.data || []
-    messages.value = Array.isArray(list) ? list : []
+    const res = await getMessages(id, { page: 1, size: 100 })
+    const records = res.data?.records || res.data?.data || res.data || []
+    const list = Array.isArray(records) ? records : []
+    if (list.length > 0 && list[0].question !== undefined) {
+      messages.value = list.flatMap(r => {
+        const msgs = [{ role: 'user', content: r.question, timestamp: r.createTime }]
+        if (r.answer) {
+          msgs.push({ role: 'assistant', content: r.answer, reasoningContent: r.reasoningContent || null, sources: r.sources || [], timestamp: r.createTime })
+        }
+        return msgs
+      })
+    } else {
+      messages.value = list
+    }
     await nextTick()
     scrollToBottom()
   } catch {
@@ -155,6 +182,26 @@ async function newConversation() {
   activeConversationId.value = ''
   messages.value = []
   inputText.value = ''
+}
+
+function startEditTitle(conv) {
+  editingConvId.value = conv.id
+  editTitleText.value = conv.title
+  nextTick(() => {
+    if (titleInputRef.value) titleInputRef.value.focus()
+  })
+}
+
+async function saveEditTitle(conv) {
+  if (editTitleText.value.trim() && editTitleText.value !== conv.title) {
+    conv.title = editTitleText.value
+    try {
+      await updateConversationTitle(conv.id, { title: editTitleText.value })
+    } catch {
+      conv.title = conv.title
+    }
+  }
+  editingConvId.value = null
 }
 
 async function sendMessage() {
@@ -277,6 +324,32 @@ function scrollToBottom() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.conv-title-wrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.conv-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-icon {
+  display: none;
+  margin-left: 4px;
+  font-size: 14px;
+  color: #909399;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.conv-title-wrapper:hover .edit-icon {
+  display: inline-flex;
 }
 
 .delete-btn {

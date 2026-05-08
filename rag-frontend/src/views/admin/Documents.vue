@@ -2,6 +2,41 @@
   <div class="documents-page">
     <h2 class="page-title">文档管理</h2>
 
+    <!-- KB Management -->
+    <div class="kb-section">
+      <div class="section-header">
+        <h3 class="section-title">知识库管理</h3>
+        <el-button type="primary" size="small" @click="openKbDialog()">新建知识库</el-button>
+      </div>
+      <el-table :data="kbList" v-loading="kbLoading" size="small" style="margin-bottom:24px">
+        <el-table-column prop="name" label="名称" min-width="140" />
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="创建时间" width="170" />
+        <el-table-column label="操作" width="140">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="openKbDialog(row)">编辑</el-button>
+            <el-button type="danger" link size="small" @click="handleDeleteKb(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- KB Dialog -->
+    <el-dialog v-model="kbDialogVisible" :title="kbEditingId ? '编辑知识库' : '新建知识库'" width="480px">
+      <el-form :model="kbForm" label-position="top">
+        <el-form-item label="名称" required>
+          <el-input v-model="kbForm.name" placeholder="请输入知识库名称" maxlength="128" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="kbForm.description" type="textarea" :rows="3" placeholder="请输入描述（选填）" maxlength="512" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="kbDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="kbSaving" @click="handleSaveKb">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Toolbar -->
     <el-card class="toolbar-card" shadow="never">
       <el-row :gutter="16" align="middle">
@@ -137,7 +172,7 @@
 import { ref, onMounted } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listKnowledgeBases } from '../../api/knowledge'
+import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '../../api/knowledge'
 import { uploadDocument, listDocuments, deleteDocument, reprocessDocument } from '../../api/document'
 
 const knowledgeBases = ref([])
@@ -155,7 +190,16 @@ const uploadFile = ref(null)
 const uploadRef = ref(null)
 const uploading = ref(false)
 
+// KB management
+const kbList = ref([])
+const kbLoading = ref(false)
+const kbDialogVisible = ref(false)
+const kbEditingId = ref(null)
+const kbSaving = ref(false)
+const kbForm = reactive({ name: '', description: '' })
+
 onMounted(async () => {
+  await loadKnowledgeBases()
   try {
     const res = await listKnowledgeBases()
     const list = res.data?.data || res.data || []
@@ -242,6 +286,61 @@ async function handleDelete(row) {
   }
 }
 
+async function loadKnowledgeBases() {
+  kbLoading.value = true
+  try {
+    const res = await listKnowledgeBases()
+    kbList.value = res.data?.data || res.data || []
+  } finally {
+    kbLoading.value = false
+  }
+}
+
+function openKbDialog(row) {
+  if (row) {
+    kbEditingId.value = row.id
+    kbForm.name = row.name
+    kbForm.description = row.description || ''
+  } else {
+    kbEditingId.value = null
+    kbForm.name = ''
+    kbForm.description = ''
+  }
+  kbDialogVisible.value = true
+}
+
+async function handleSaveKb() {
+  if (!kbForm.name.trim()) {
+    ElMessage.warning('请输入知识库名称')
+    return
+  }
+  kbSaving.value = true
+  try {
+    if (kbEditingId.value) {
+      await updateKnowledgeBase(kbEditingId.value, { name: kbForm.name, description: kbForm.description })
+      ElMessage.success('知识库已更新')
+    } else {
+      await createKnowledgeBase({ name: kbForm.name, description: kbForm.description })
+      ElMessage.success('知识库已创建')
+    }
+    kbDialogVisible.value = false
+    await loadKnowledgeBases()
+  } finally {
+    kbSaving.value = false
+  }
+}
+
+async function handleDeleteKb(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除知识库「${row.name}」吗？`, '确认删除', { type: 'warning' })
+    await deleteKnowledgeBase(row.id)
+    ElMessage.success('知识库已删除')
+    await loadKnowledgeBases()
+  } catch {
+    // cancelled or error
+  }
+}
+
 function formatSize(bytes) {
   if (!bytes) return '-'
   if (bytes < 1024) return bytes + ' B'
@@ -279,6 +378,23 @@ function statusLabel(status) {
   font-size: 20px;
   color: #303133;
   margin: 0 0 24px 0;
+}
+
+.kb-section {
+  margin-bottom: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  color: #303133;
+  margin: 0;
 }
 
 .toolbar-card {

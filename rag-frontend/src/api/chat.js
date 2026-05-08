@@ -24,6 +24,10 @@ export function feedback(data) {
   return request.post('/api/v1/chat/feedback', data)
 }
 
+export function updateConversationTitle(id, data) {
+  return request.put(`/api/v1/chat/conversation/${id}/title`, data)
+}
+
 export function getStreamUrl(params) {
   const query = new URLSearchParams(params).toString()
   return `/api/v1/chat/stream?${query}`

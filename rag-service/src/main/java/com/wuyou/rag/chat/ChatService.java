@@ -14,6 +14,8 @@ public interface ChatService {
 
     Result<Void> deleteConversation(Long conversationId, Long userId);
 
+    Result<Void> updateConversationTitle(Long conversationId, Long userId, String title);
+
     // Chat
     Result<ChatResponse> chat(Long userId, Long conversationId, String question, String ip, String userAgent);
 

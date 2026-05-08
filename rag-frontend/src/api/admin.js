@@ -23,3 +23,7 @@ export function getUsers(params) {
 export function updateUser(id, data) {
   return request.put(`/api/v1/admin/users/${id}`, data)
 }
+
+export function createUser(data) {
+  return request.post('/api/v1/admin/users', data)
+}

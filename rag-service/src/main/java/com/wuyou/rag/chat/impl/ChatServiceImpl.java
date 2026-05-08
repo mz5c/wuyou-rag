@@ -113,6 +113,21 @@ public class ChatServiceImpl implements ChatService {
         return Result.success(null);
     }
 
+    @Override
+    public Result<Void> updateConversationTitle(Long conversationId, Long userId, String title) {
+        KbConversation conversation = conversationMapper.selectById(conversationId);
+        if (conversation == null) {
+            return Result.fail(ErrorCode.NOT_FOUND.getCode(), "对话不存在");
+        }
+        if (!conversation.getUserId().equals(userId)) {
+            return Result.fail(ErrorCode.FORBIDDEN.getCode(), "无权修改此对话");
+        }
+        conversation.setTitle(title);
+        conversation.setUpdateTime(LocalDateTime.now());
+        conversationMapper.updateById(conversation);
+        return Result.success(null);
+    }
+
     // ---- Chat ----
 
     @Override

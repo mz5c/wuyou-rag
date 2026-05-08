@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -72,6 +73,13 @@ public class ChatController {
         return chatService.feedback(request.getHistoryId(), request.getFeedback(), request.getComment());
     }
 
+    @PutMapping("/conversation/{conversationId}")
+    public Result<Void> updateConversationTitle(@PathVariable Long conversationId,
+                                                 @RequestBody @Valid UpdateTitleRequest request,
+                                                 @AuthenticationPrincipal Long userId) {
+        return chatService.updateConversationTitle(conversationId, userId, request.getTitle());
+    }
+
     // ---- SSE Streaming ----
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -106,5 +114,11 @@ public class ChatController {
         private Integer feedback;
 
         private String comment;
+    }
+
+    @Data
+    public static class UpdateTitleRequest {
+        @NotBlank(message = "标题不能为空")
+        private String title;
     }
 }
