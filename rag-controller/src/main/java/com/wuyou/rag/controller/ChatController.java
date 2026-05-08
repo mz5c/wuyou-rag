@@ -39,7 +39,7 @@ public class ChatController {
     @PostMapping
     public Result<ChatService.ChatResponse> chat(@RequestBody @Valid ChatRequest request,
                                                   @AuthenticationPrincipal Long userId) {
-        String ip = httpServletRequest.getRemoteAddr();
+        String ip = normalizeIp(httpServletRequest.getRemoteAddr());
         String userAgent = httpServletRequest.getHeader("User-Agent");
         return chatService.chat(userId, request.getConversationId(), request.getQuestion(), ip, userAgent);
     }
@@ -120,5 +120,12 @@ public class ChatController {
     public static class UpdateTitleRequest {
         @NotBlank(message = "标题不能为空")
         private String title;
+    }
+
+    private static String normalizeIp(String ip) {
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            return "127.0.0.1";
+        }
+        return ip;
     }
 }

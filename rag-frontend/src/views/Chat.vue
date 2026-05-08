@@ -46,7 +46,7 @@
         </div>
       </div>
       <div class="sidebar-footer">
-        <el-button text @click="goToAdmin" v-if="isAdmin">
+        <el-button text @click="goToAdmin" v-if="isAdmin()">
           <el-icon><Setting /></el-icon>
           管理后台
         </el-button>
@@ -158,7 +158,8 @@ async function switchConversation(id) {
   messages.value = []
   try {
     const res = await getMessages(id, { page: 1, size: 100 })
-    const records = res.data?.records || res.data?.data || res.data || []
+    const pageData = res.data?.data
+    const records = pageData?.records || []
     const list = Array.isArray(records) ? records : []
     if (list.length > 0 && list[0].question !== undefined) {
       messages.value = list.flatMap(r => {
@@ -169,7 +170,7 @@ async function switchConversation(id) {
         return msgs
       })
     } else {
-      messages.value = list
+      messages.value = []
     }
     await nextTick()
     scrollToBottom()
@@ -226,6 +227,7 @@ async function sendMessage() {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
       content: data.answer || data.content || data.response || '',
+      reasoningContent: data.reasoningContent || null,
       sources: data.sources || data.references || [],
       timestamp: new Date().toLocaleTimeString()
     }

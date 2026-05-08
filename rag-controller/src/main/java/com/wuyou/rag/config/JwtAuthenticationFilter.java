@@ -1,6 +1,8 @@
 package com.wuyou.rag.config;
 
 import com.wuyou.rag.auth.JwtTokenProvider;
+import com.wuyou.rag.entity.sys.SysUser;
+import com.wuyou.rag.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,6 +26,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final SysUserMapper sysUserMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,6 +39,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = claims.get("userId", Long.class);
                 String username = claims.getSubject();
                 String role = claims.get("role", String.class);
+
+                // Check if user is enabled
+                SysUser user = sysUserMapper.selectById(userId);
+                if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+                    log.warn("User {} is disabled or not found, denying access", userId);
+                    return;
+                }
 
                 List<SimpleGrantedAuthority> authorities = List.of(
                         new SimpleGrantedAuthority("ROLE_" + role)

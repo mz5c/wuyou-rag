@@ -25,7 +25,7 @@ export function feedback(data) {
 }
 
 export function updateConversationTitle(id, data) {
-  return request.put(`/api/v1/chat/conversation/${id}/title`, data)
+  return request.put(`/api/v1/chat/conversation/${id}`, data)
 }
 
 export function getStreamUrl(params) {

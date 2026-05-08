@@ -9,7 +9,7 @@
               <el-icon :size="28"><Collection /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.knowledgeBaseCount || 0 }}</div>
+              <div class="stat-value">{{ stats.totalKnowledgeBases || 0 }}</div>
               <div class="stat-label">知识库数</div>
             </div>
           </div>
@@ -22,7 +22,7 @@
               <el-icon :size="28"><Document /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.documentCount || 0 }}</div>
+              <div class="stat-value">{{ stats.totalDocuments || 0 }}</div>
               <div class="stat-label">文档数</div>
             </div>
           </div>
@@ -35,7 +35,7 @@
               <el-icon :size="28"><ChatDotSquare /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.conversationCount || 0 }}</div>
+              <div class="stat-value">{{ stats.totalChats || 0 }}</div>
               <div class="stat-label">问答数</div>
             </div>
           </div>
@@ -48,7 +48,7 @@
               <el-icon :size="28"><User /></el-icon>
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.userCount || 0 }}</div>
+              <div class="stat-value">{{ stats.totalUsers || 0 }}</div>
               <div class="stat-label">用户数</div>
             </div>
           </div>

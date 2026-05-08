@@ -198,7 +198,7 @@ public class StreamingChatService {
                 }
 
                 // 15. Audit log
-                String ip = httpServletRequest.getRemoteAddr();
+                String ip = normalizeIp(httpServletRequest.getRemoteAddr());
                 String userAgent = httpServletRequest.getHeader("User-Agent");
                 String detail = "对话ID: " + resolvedConversationId + ", 问题长度: " + question.length();
                 auditLogService.log(userId, "user", "CHAT", detail, ip, userAgent);
@@ -304,5 +304,12 @@ public class StreamingChatService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("MD5 algorithm not available", e);
         }
+    }
+
+    private static String normalizeIp(String ip) {
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            return "127.0.0.1";
+        }
+        return ip;
     }
 }
