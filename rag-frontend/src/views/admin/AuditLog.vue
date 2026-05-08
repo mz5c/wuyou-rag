@@ -126,23 +126,13 @@ function operationLabel(op) {
 </script>
 
 <style scoped>
-.audit-page {
-  max-width: 1200px;
-}
-
+.audit-page { max-width: 1200px; }
 .page-title {
-  font-size: 20px;
-  color: #303133;
-  margin: 0 0 24px 0;
+  font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
 }
-
 .filter-card {
-  margin-bottom: 16px;
+  margin-bottom: 16px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
 }
-
-.pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
+.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>

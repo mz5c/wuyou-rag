@@ -10,11 +10,11 @@ CREATE TABLE IF NOT EXISTS sys_user (
     username    VARCHAR(32)  NOT NULL UNIQUE,
     password    VARCHAR(128) NOT NULL,
     nickname    VARCHAR(64),
-    role        VARCHAR(16)  NOT NULL DEFAULT 'USER',
-    status      TINYINT      NOT NULL DEFAULT 1,
+    role        VARCHAR(16)  NOT NULL DEFAULT 'USER' COMMENT '角色：ADMIN=管理员, USER=普通用户',
+    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：1=启用, 0=禁用',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted     TINYINT      NOT NULL DEFAULT 0
+    deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 知识库分类表
@@ -22,28 +22,28 @@ CREATE TABLE IF NOT EXISTS kb_knowledge_base (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     name        VARCHAR(128) NOT NULL,
     description VARCHAR(512),
-    status      TINYINT      NOT NULL DEFAULT 1,
+    status      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：1=启用, 0=禁用',
     create_by   BIGINT,
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted     TINYINT      NOT NULL DEFAULT 0
+    deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库分类表';
 
 -- 文档表
 CREATE TABLE IF NOT EXISTS kb_document (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-    kb_id        BIGINT       NOT NULL,
+    kb_id        BIGINT       NOT NULL COMMENT '所属知识库ID',
     title        VARCHAR(256) NOT NULL,
-    file_type    VARCHAR(16)  NOT NULL,
-    file_url     VARCHAR(512) NOT NULL,
-    file_size    BIGINT,
-    chunk_count  INT          DEFAULT 0,
-    status       TINYINT      NOT NULL DEFAULT 0,
+    file_type    VARCHAR(16)  NOT NULL COMMENT '文件扩展名，如 pdf/docx/txt/md',
+    file_url     VARCHAR(512) NOT NULL COMMENT 'MinIO 存储URL',
+    file_size    BIGINT COMMENT '文件大小（字节）',
+    chunk_count  INT          DEFAULT 0 COMMENT '文档分块数量',
+    status       TINYINT      NOT NULL DEFAULT 0 COMMENT '处理状态：0=待处理, 1=处理中, 2=完成, 3=失败',
     error_msg    VARCHAR(512),
     create_by    BIGINT,
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted      TINYINT      NOT NULL DEFAULT 0,
+    deleted      TINYINT      NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除',
     INDEX idx_kb_id (kb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档表';
 
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS kb_chunk (
     chunk_content  TEXT         NOT NULL,
     chunk_index    INT          NOT NULL,
     chunk_size     INT,
-    vector_id      VARCHAR(64),
+    vector_id      VARCHAR(64) COMMENT 'Milvus 向量ID',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_doc_id (doc_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文本分块表';
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS kb_conversation (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id        BIGINT       NOT NULL,
     title          VARCHAR(256) DEFAULT '新对话',
-    kb_id          BIGINT,
+    kb_id          BIGINT COMMENT '关联知识库ID（可空）',
     message_count  INT          DEFAULT 0,
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -78,10 +78,10 @@ CREATE TABLE IF NOT EXISTS kb_chat_history (
     user_id          BIGINT       NOT NULL,
     question         TEXT         NOT NULL,
     answer           LONGTEXT,
-    answer_type      VARCHAR(8)   DEFAULT 'llm',
+    answer_type      VARCHAR(8)   DEFAULT 'llm' COMMENT '回答类型：llm=模型生成, exact=缓存命中',
     used_chunk_ids   TEXT,
     sources          JSON,
-    feedback         TINYINT,
+    feedback         TINYINT COMMENT '用户反馈：1=点赞, 0=点踩, NULL=未评价',
     feedback_comment VARCHAR(256),
     elapsed_ms       INT,
     tokens_used      INT,
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS kb_audit_log (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id     BIGINT,
     username    VARCHAR(32),
-    operation   VARCHAR(64)  NOT NULL,
+    operation   VARCHAR(64)  NOT NULL COMMENT '操作类型：LOGIN/LOGOUT/UPLOAD_DOC/DELETE_DOC/CREATE_KB/DELETE_KB/CONFIG_UPDATE/USER_MANAGE/CHAT',
     detail      VARCHAR(1024),
     ip          VARCHAR(64),
     user_agent  VARCHAR(256),
@@ -108,8 +108,8 @@ CREATE TABLE IF NOT EXISTS kb_audit_log (
 -- 系统配置表
 CREATE TABLE IF NOT EXISTS kb_config (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-    config_key   VARCHAR(64)  NOT NULL UNIQUE,
-    config_value VARCHAR(256) NOT NULL,
+    config_key   VARCHAR(64)  NOT NULL UNIQUE COMMENT '配置键，如 llm.api_url',
+    config_value VARCHAR(256) NOT NULL COMMENT '配置值',
     description  VARCHAR(256),
     update_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';

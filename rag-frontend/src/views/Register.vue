@@ -91,11 +91,12 @@ async function handleRegister() {
   background: linear-gradient(135deg, #eff6ff 0%, #f1f5f9 100%);
 }
 .auth-card {
-  width: 420px; padding: 32px 28px 20px; border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+  width: 420px; padding: 32px 28px 20px; border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); border: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
-.auth-title { text-align: center; margin-bottom: 24px; font-size: 20px; color: #0f172a; }
-.auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #64748b; }
-.auth-link a { color: #2563eb; text-decoration: none; }
-.auth-link a:hover { text-decoration: underline; }
+.auth-title { text-align: center; margin-bottom: 24px; font-size: var(--font-size-xl); color: var(--color-text); font-weight: 600; }
+.auth-link { text-align: center; margin-top: 16px; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.auth-link a { color: var(--color-accent); text-decoration: none; font-weight: 500; }
+.auth-link a:hover { color: var(--color-accent-hover); }
 </style>

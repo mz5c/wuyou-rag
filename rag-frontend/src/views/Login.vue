@@ -105,40 +105,19 @@ async function handleLogin() {
 
 <style scoped>
 .login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex; justify-content: center; align-items: center; min-height: 100vh;
+  background: linear-gradient(135deg, #eff6ff 0%, #f1f5f9 100%);
 }
 .login-card {
-  width: 400px;
-  padding: 40px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  width: 400px; padding: 40px; background: var(--color-surface);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
 }
-.login-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-.login-title {
-  font-size: 24px;
-  color: #303133;
-  margin: 0 0 8px 0;
-}
-.login-subtitle {
-  font-size: 14px;
-  color: #909399;
-  margin: 0;
-}
-.login-error {
-  color: #f56c6c;
-  font-size: 13px;
-  text-align: center;
-  margin-top: 12px;
-}
-.auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #64748b; }
-.auth-link a { color: #2563eb; text-decoration: none; }
-.auth-link a:hover { text-decoration: underline; }
+.login-header { text-align: center; margin-bottom: 32px; }
+.login-title { font-size: var(--font-size-2xl); color: var(--color-text); margin: 0 0 8px 0; font-weight: 700; }
+.login-subtitle { font-size: var(--font-size-base); color: var(--color-text-secondary); margin: 0; }
+.login-error { color: var(--color-danger); font-size: var(--font-size-sm); text-align: center; margin-top: 12px; }
+.auth-link { text-align: center; margin-top: 16px; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.auth-link a { color: var(--color-accent); text-decoration: none; font-weight: 500; }
+.auth-link a:hover { color: var(--color-accent-hover); }
 </style>

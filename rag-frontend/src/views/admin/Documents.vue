@@ -370,40 +370,19 @@ function statusLabel(status) {
 </script>
 
 <style scoped>
-.documents-page {
-  max-width: 1200px;
-}
-
+.documents-page { max-width: 1200px; }
 .page-title {
-  font-size: 20px;
-  color: #303133;
-  margin: 0 0 24px 0;
+  font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
 }
-
 .kb-section {
-  margin-bottom: 24px;
+  margin-bottom: 24px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-sm);
 }
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 16px;
-  color: #303133;
-  margin: 0;
-}
-
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.section-title { font-size: var(--font-size-lg); color: var(--color-text); margin: 0; font-weight: 600; }
 .toolbar-card {
-  margin-bottom: 16px;
+  margin-bottom: 16px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
 }
-
-.pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
+.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>

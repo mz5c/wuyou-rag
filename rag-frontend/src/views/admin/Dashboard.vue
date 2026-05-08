@@ -76,54 +76,21 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.dashboard {
-  max-width: 1200px;
-}
-
+.dashboard { max-width: 1200px; }
 .page-title {
-  font-size: 20px;
-  color: #303133;
-  margin: 0 0 24px 0;
+  font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
 }
-
 .stat-card {
-  margin-bottom: 20px;
+  margin-bottom: 20px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
 }
-
-.stat-card :deep(.el-card__body) {
-  padding: 20px;
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
+.stat-card :deep(.el-card__body) { padding: 20px; }
+.stat-content { display: flex; align-items: center; gap: 16px; }
 .stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 56px; height: 56px; border-radius: var(--radius-sm); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
 }
-
-.stat-info {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #303133;
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #909399;
-  margin-top: 4px;
-}
+.stat-info { flex: 1; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--color-text); line-height: 1.2; }
+.stat-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: 4px; }
 </style>

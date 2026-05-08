@@ -15,20 +15,27 @@ public class KbConversation implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 会话ID */
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 所属用户ID */
     private Long userId;
 
+    /** 会话标题 */
     private String title = "新对话";
 
+    /** 关联知识库ID（可空） */
     private Long kbId;
 
+    /** 消息数量 */
     private Integer messageCount = 0;
 
+    /** 创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
+    /** 更新时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 }

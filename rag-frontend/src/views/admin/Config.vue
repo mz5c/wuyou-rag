@@ -6,7 +6,7 @@
       <el-table :data="configs" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="configKey" label="配置键" min-width="200">
           <template #default="{ row }">
-            <code style="font-size: 13px; color: #409eff">{{ row.configKey || row.key }}</code>
+            <code class="config-key">{{ row.configKey || row.key }}</code>
           </template>
         </el-table-column>
         <el-table-column label="配置值" min-width="300">
@@ -105,13 +105,12 @@ async function saveConfig(row) {
 </script>
 
 <style scoped>
-.config-page {
-  max-width: 1200px;
-}
-
+.config-page { max-width: 1200px; }
 .page-title {
-  font-size: 20px;
-  color: #303133;
-  margin: 0 0 24px 0;
+  font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
+}
+.config-key {
+  font-size: var(--font-size-sm); color: var(--color-accent); background: var(--color-accent-light);
+  padding: 2px 6px; border-radius: var(--radius-sm); font-family: 'SF Mono', 'Fira Code', monospace;
 }
 </style>

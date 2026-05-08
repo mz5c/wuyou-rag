@@ -2,13 +2,11 @@
   <div class="admin-layout">
     <!-- Sidebar -->
     <div class="admin-sidebar">
-      <div class="sidebar-logo">
-        <h2>RAG 管理后台</h2>
-      </div>
+      <div class="sidebar-logo">RAG 管理后台</div>
+      <div class="sidebar-menu">
       <el-menu
         :default-active="activeMenu"
         router
-        style="border-right: none"
       >
         <el-menu-item index="/admin/dashboard">
           <el-icon><DataAnalysis /></el-icon>
@@ -31,27 +29,28 @@
           <span>用户管理</span>
         </el-menu-item>
       </el-menu>
+      </div>
     </div>
 
     <!-- Main Content -->
     <div class="admin-main">
-      <header class="admin-header">
-        <div class="header-left">
+      <header class="admin-topbar">
+        <div class="topbar-left">
           <el-breadcrumb>
             <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
-        <div class="header-right">
-          <span class="user-info">
+        <div class="topbar-right">
+          <span class="user-name">
             <el-icon><User /></el-icon>
             {{ nickname || username }}
           </span>
-          <el-button text @click="goToChat">
+          <el-button class="back-btn" text @click="goToChat">
             <el-icon><ChatDotSquare /></el-icon>
             返回对话
           </el-button>
-          <el-button text @click="handleLogout">
+          <el-button class="logout-btn" text @click="handleLogout">
             <el-icon><SwitchButton /></el-icon>
             退出
           </el-button>
@@ -100,90 +99,40 @@ async function handleLogout() {
 </script>
 
 <style scoped>
-.admin-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
+.admin-layout { display: flex; min-height: 100vh; }
 .admin-sidebar {
-  width: 220px;
-  background: #304156;
-  color: #bfcbd9;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
+  width: 220px; background: var(--color-sidebar-bg); border-right: 1px solid var(--color-border);
+  display: flex; flex-direction: column; flex-shrink: 0;
 }
-
 .sidebar-logo {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 20px 16px; font-size: 16px; font-weight: 700;
+  color: var(--color-text); border-bottom: 1px solid var(--color-border);
 }
-
-.sidebar-logo h2 {
-  font-size: 16px;
-  color: #fff;
-  margin: 0;
+.sidebar-menu { flex: 1; padding: 8px 0; }
+.sidebar-menu .el-menu {
+  border-right: none; background: transparent;
 }
-
-.admin-sidebar .el-menu {
-  background: transparent;
-  border-right: none;
+.sidebar-menu .el-menu-item {
+  margin: 2px 8px; border-radius: var(--radius-sm); font-size: var(--font-size-base);
+  color: var(--color-text-secondary); height: 40px; line-height: 40px;
 }
-
-.admin-sidebar .el-menu-item {
-  color: #bfcbd9;
+.sidebar-menu .el-menu-item:hover { background: var(--color-sidebar-hover); color: var(--color-text); }
+.sidebar-menu .el-menu-item.is-active {
+  background: var(--color-sidebar-active-bg); color: var(--color-sidebar-active-text); font-weight: 600;
 }
-
-.admin-sidebar .el-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+.admin-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.admin-topbar {
+  height: 56px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--space-lg); background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border); flex-shrink: 0; box-shadow: var(--shadow-sm);
 }
-
-.admin-sidebar .el-menu-item.is-active {
-  color: #409eff;
-  background: rgba(64, 158, 255, 0.1);
-}
-
-.admin-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.admin-header {
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  flex-shrink: 0;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.user-info {
-  font-size: 14px;
-  color: #606266;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-right: 12px;
-}
-
-.admin-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  background: #f0f2f5;
-}
+.topbar-left { display: flex; align-items: center; gap: var(--space-sm); }
+.topbar-left .title { font-size: var(--font-size-lg); font-weight: 600; color: var(--color-text); }
+.topbar-right { display: flex; align-items: center; gap: var(--space-md); }
+.topbar-right .user-name { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.admin-content { flex: 1; overflow-y: auto; padding: var(--space-lg); }
+.back-btn { font-size: var(--font-size-sm); color: var(--color-accent); cursor: pointer; text-decoration: none; }
+.back-btn:hover { color: var(--color-accent-hover); }
+.logout-btn { font-size: var(--font-size-sm); color: var(--color-text-secondary); cursor: pointer; }
+.logout-btn:hover { color: var(--color-danger); }
 </style>

@@ -232,32 +232,11 @@ async function handleCreateUser() {
 </script>
 
 <style scoped>
-.users-page {
-  max-width: 1200px;
-}
-
+.users-page { max-width: 1200px; }
 .page-title {
-  font-size: 20px;
-  color: #303133;
-  margin: 0 0 24px 0;
+  font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
 }
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 16px;
-  color: #303133;
-  margin: 0;
-}
-
-.pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.section-title { font-size: var(--font-size-lg); color: var(--color-text); margin: 0; font-weight: 600; }
+.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>
