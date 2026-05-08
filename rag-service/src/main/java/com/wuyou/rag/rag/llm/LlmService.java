@@ -4,7 +4,9 @@ import java.util.List;
 
 public interface LlmService {
 
-    String chat(List<Message> messages);
+    ChatResult chat(List<Message> messages);
 
     record Message(String role, String content) {}
+
+    record ChatResult(String answer, String reasoningContent) {}
 }

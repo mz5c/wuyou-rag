@@ -132,7 +132,7 @@ public class ChatServiceImpl implements ChatService {
             log.info("Cache hit for question: md5={}", md5Hex(question));
             long elapsed = System.currentTimeMillis() - startTime;
             ChatResponse cachedResponse = new ChatResponse(conversationId, null,
-                    cachedAnswer, new ArrayList<>(), (int) elapsed);
+                    cachedAnswer, null, new ArrayList<>(), (int) elapsed);
             return Result.success(cachedResponse);
         }
 
@@ -200,7 +200,9 @@ public class ChatServiceImpl implements ChatService {
             List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
             // 8. LLM call
-            String answer = llmService.chat(messages);
+            LlmService.ChatResult result = llmService.chat(messages);
+            String answer = result.answer();
+            String reasoningContent = result.reasoningContent();
 
             // 9. Save chat history and update conversation
             long elapsed = System.currentTimeMillis() - startTime;
@@ -251,7 +253,7 @@ public class ChatServiceImpl implements ChatService {
 
             // 12. Return response
             ChatResponse response = new ChatResponse(
-                    conversationId, history.getId(), answer, sources, (int) elapsed);
+                    conversationId, history.getId(), answer, reasoningContent, sources, (int) elapsed);
             return Result.success(response);
 
         } catch (BizException e) {
@@ -260,7 +262,7 @@ public class ChatServiceImpl implements ChatService {
             log.error("Chat processing failed: userId={}, conversationId={}", userId, conversationId, e);
             long elapsed = System.currentTimeMillis() - startTime;
             ChatResponse response = new ChatResponse(conversationId, null, FALLBACK_ANSWER,
-                    new ArrayList<>(), (int) elapsed);
+                    null, new ArrayList<>(), (int) elapsed);
             return Result.success(response);
         }
     }

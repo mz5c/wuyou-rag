@@ -28,6 +28,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.alibaba.fastjson.JSONObject;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -135,9 +137,20 @@ public class StreamingChatService {
                 List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
                 // 9. LLM call (non-streaming for now, simulate token streaming)
-                String fullAnswer = llmService.chat(messages);
+                LlmService.ChatResult result = llmService.chat(messages);
+                String fullAnswer = result.answer();
+                String reasoningContent = result.reasoningContent();
 
-                // 10. Stream answer token by token
+                // 10. Send reasoning content event
+                if (reasoningContent != null) {
+                    JSONObject reasoningEvent = new JSONObject();
+                    reasoningEvent.put("content", reasoningContent);
+                    emitter.send(SseEmitter.event()
+                            .name("reasoning")
+                            .data(reasoningEvent.toJSONString()));
+                }
+
+                // 11. Stream answer token by token
                 for (char c : fullAnswer.toCharArray()) {
                     emitter.send(SseEmitter.event()
                             .name("token")
@@ -145,13 +158,13 @@ public class StreamingChatService {
                     Thread.sleep(TOKEN_DELAY_MS);
                 }
 
-                // 11. Send done event with elapsed time
+                // 12. Send done event with elapsed time
                 long elapsed = System.currentTimeMillis() - startTime;
                 emitter.send(SseEmitter.event()
                         .name("done")
                         .data("{\"elapsedMs\": " + elapsed + "}"));
 
-                // 12. Save chat history
+                // 13. Save chat history
                 String usedChunkIds = chunkIds.stream()
                         .map(String::valueOf)
                         .collect(Collectors.joining(","));
@@ -176,7 +189,7 @@ public class StreamingChatService {
                     conversationMapper.updateById(conv);
                 }
 
-                // 13. Cache hot QA (skip fallback error messages)
+                // 14. Cache hot QA (skip fallback error messages)
                 if (!fullAnswer.contains(FALLBACK_ANSWER)) {
                     long cacheTtl = getCacheTtl();
                     String cacheKey = CACHE_KEY_PREFIX + md5Hex(question);
@@ -184,7 +197,7 @@ public class StreamingChatService {
                     log.debug("Cached streaming QA response: key={}, ttl={}s", cacheKey, cacheTtl);
                 }
 
-                // 14. Audit log
+                // 15. Audit log
                 String ip = httpServletRequest.getRemoteAddr();
                 String userAgent = httpServletRequest.getHeader("User-Agent");
                 String detail = "对话ID: " + resolvedConversationId + ", 问题长度: " + question.length();

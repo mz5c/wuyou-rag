@@ -15,8 +15,8 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'" size="small">
-              {{ row.status === 'ACTIVE' ? '启用' : '禁用' }}
+            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
+              {{ row.status === 1 ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -128,7 +128,7 @@ function openEditDialog(row) {
   editForm.username = row.username
   editForm.nickname = row.nickname || ''
   editForm.role = row.role || 'USER'
-  editForm.statusActive = row.status === 'ACTIVE'
+  editForm.statusActive = row.status === 1
   editForm.password = ''
   editDialogVisible.value = true
 }
@@ -139,7 +139,7 @@ async function handleSaveUser() {
     const data = {
       nickname: editForm.nickname,
       role: editForm.role,
-      status: editForm.statusActive ? 'ACTIVE' : 'INACTIVE'
+      status: editForm.statusActive ? 1 : 0
     }
     if (editForm.password) {
       data.password = editForm.password

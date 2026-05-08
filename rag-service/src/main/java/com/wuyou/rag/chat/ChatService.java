@@ -24,7 +24,7 @@ public interface ChatService {
     Result<Void> feedback(Long historyId, Integer feedback, String comment);
 
     record ChatResponse(Long conversationId, Long historyId, String answer,
-                        List<SourceDoc> sources, int elapsedMs) {}
+                        String reasoningContent, List<SourceDoc> sources, int elapsedMs) {}
 
     record SourceDoc(Long chunkId, String content, String docTitle, String docUrl) {}
 }

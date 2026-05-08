@@ -18,11 +18,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class QwenLlmService implements LlmService {
+
+    private static final Pattern REASONING_PATTERN = Pattern.compile(
+            "\\s*<reasoning>([\\s\\S]*?)</reasoning>\\s*|([\\s\\S]*?)</think>\\s*",
+            Pattern.CASE_INSENSITIVE);
 
     private final RestTemplate restTemplate;
 
@@ -39,7 +45,7 @@ public class QwenLlmService implements LlmService {
     @CircuitBreaker(name = "llmService", fallbackMethod = "chatFallback")
     @RateLimiter(name = "llmService")
     @Retry(name = "llmService")
-    public String chat(List<Message> messages) {
+    public ChatResult chat(List<Message> messages) {
         String url = llmApiUrl;
 
         JSONArray messagesArray = new JSONArray();
@@ -75,7 +81,7 @@ public class QwenLlmService implements LlmService {
             if (message != null) {
                 String content = message.getString("content");
                 if (content != null) {
-                    return content;
+                    return parseReasoningContent(content);
                 }
             }
         }
@@ -83,9 +89,27 @@ public class QwenLlmService implements LlmService {
         throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "LLM返回为空");
     }
 
+    ChatResult parseReasoningContent(String rawResponse) {
+        Matcher matcher = REASONING_PATTERN.matcher(rawResponse);
+        String reasoningContent = null;
+        if (matcher.find()) {
+            reasoningContent = matcher.group(1) != null ? matcher.group(1).trim() : matcher.group(2).trim();
+        }
+        String cleanAnswer = REASONING_PATTERN.matcher(rawResponse).replaceAll("").trim();
+        if (cleanAnswer.isEmpty()) {
+            cleanAnswer = rawResponse;
+        }
+        return new ChatResult(cleanAnswer, reasoningContent);
+    }
+
+    String cleanAnswerForContext(String answer) {
+        if (answer == null) return null;
+        return REASONING_PATTERN.matcher(answer).replaceAll("").trim();
+    }
+
     @SuppressWarnings("unused")
-    public String chatFallback(List<Message> messages, Throwable t) {
+    public ChatResult chatFallback(List<Message> messages, Throwable t) {
         log.error("LLM call failed after retries: {}", t.getMessage());
-        return "抱歉，AI 服务暂时不可用，请稍后再试。";
+        return new ChatResult("抱歉，AI 服务暂时不可用，请稍后再试。", null);
     }
 }
