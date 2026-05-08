@@ -1,17 +1,13 @@
 <template>
   <div class="source-references">
-    <el-divider content-position="left" style="margin: 8px 0">
-      <span style="font-size: 12px; color: #909399">来源文档</span>
-    </el-divider>
+    <div class="source-divider">
+      <span>来源文档</span>
+    </div>
     <div v-for="(source, index) in sources" :key="index" class="source-item">
       <div class="source-header" @click="toggleExpand(index)">
-        <el-icon style="margin-right: 4px">
-          <Document />
-        </el-icon>
+        <WIcon name="document" size="14" />
         <span class="source-title">{{ source.docTitle || source.documentTitle || '未知文档' }}</span>
-        <el-icon style="margin-left: auto; transition: transform 0.2s" :class="{ expanded: expandedIndex === index }">
-          <ArrowDown />
-        </el-icon>
+        <WIcon :name="expandedIndex === index ? 'arrowDown' : 'arrowRight'" size="12" class="source-arrow" />
       </div>
       <div v-show="expandedIndex === index" class="source-body">
         <p class="source-content">{{ source.content || source.chunkContent || source.text || '' }}</p>
@@ -44,56 +40,66 @@ function toggleExpand(index) {
 .source-references {
   margin-top: 4px;
 }
-
-.source-item {
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 4px;
-  border: 1px solid #ebeef5;
-  background-color: #fafafa;
+.source-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.source-divider::before,
+.source-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border-light);
 }
 
+.source-item {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 4px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+}
 .source-header {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   cursor: pointer;
-  font-size: 13px;
-  color: #606266;
-  transition: background-color 0.2s;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition: background var(--duration-fast);
 }
-
 .source-header:hover {
-  background-color: #f0f2f5;
+  background: var(--color-primary-50);
 }
-
 .source-title {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
+.source-arrow {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
 .source-body {
   padding: 8px 10px;
-  border-top: 1px solid #ebeef5;
-  background-color: #fff;
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-surface);
 }
-
 .source-content {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   line-height: 1.6;
   margin: 0;
 }
-
 .source-score {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
   margin-top: 6px;
-}
-
-.expanded {
-  transform: rotate(180deg);
 }
 </style>
