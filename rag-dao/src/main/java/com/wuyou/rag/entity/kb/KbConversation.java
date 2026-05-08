@@ -2,8 +2,10 @@ package com.wuyou.rag.entity.kb;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -30,6 +32,11 @@ public class KbConversation implements Serializable {
 
     /** 消息数量 */
     private Integer messageCount = 0;
+
+    /** 逻辑删除：0=正常, 1=已删除 */
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
 
     /** 创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

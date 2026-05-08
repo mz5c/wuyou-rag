@@ -1,59 +1,63 @@
 <template>
-  <div class="chat-container">
+  <div class="chat-page">
     <!-- Sidebar -->
     <div class="chat-sidebar">
       <div class="sidebar-header">
-        <h2 class="sidebar-title">RAG 知识库</h2>
-        <el-button type="primary" :icon="Plus" style="width: 100%" @click="newConversation">
-          新对话
-        </el-button>
+        <div class="sidebar-brand">
+          <div class="sidebar-brand__icon">W</div>
+          <span>Wuyou RAG</span>
+        </div>
+        <button class="sidebar-new-btn" @click="newConversation">
+          <WIcon name="plus" size="14" /> 新对话
+        </button>
       </div>
-      <div class="sidebar-conversations">
-        <el-menu
-          :default-active="activeConversationId"
-          @select="switchConversation"
-          style="border-right: none"
-        >
-          <el-menu-item
-            v-for="conv in conversations"
+      <div class="sidebar-list">
+        <template v-if="conversations.length === 0">
+          <div class="sidebar-empty">暂无对话</div>
+        </template>
+        <template v-for="group in groupedConversations" :key="group.label">
+          <div class="sidebar-group-label">{{ group.label }}</div>
+          <div
+            v-for="conv in group.items"
             :key="conv.id || conv.conversationId"
-            :index="String(conv.id || conv.conversationId)"
+            :class="['sidebar-item', { 'sidebar-item--active': activeConversationId === String(conv.id || conv.conversationId) }]"
+            @click="switchConversation(conv.id || conv.conversationId)"
           >
-            <el-icon><ChatDotSquare /></el-icon>
-            <div class="conv-title-wrapper">
-              <span v-if="editingConvId !== conv.id" @dblclick="startEditTitle(conv)" class="conv-title">{{ conv.title || conv.topic || '新对话' }}</span>
-              <el-input
+            <WIcon name="chat" size="16" class="sidebar-item__icon" />
+            <div class="sidebar-item__content">
+              <span
+                v-if="editingConvId !== conv.id"
+                class="sidebar-item__title"
+                @dblclick.stop="startEditTitle(conv)"
+              >{{ conv.title || conv.topic || '新对话' }}</span>
+              <input
                 v-else
                 v-model="editTitleText"
-                size="small"
+                class="sidebar-item__edit"
                 @blur="saveEditTitle(conv)"
                 @keyup.enter="saveEditTitle(conv)"
                 ref="titleInputRef"
                 maxlength="100"
               />
-              <el-icon class="edit-icon" @click="startEditTitle(conv)"><Edit /></el-icon>
             </div>
-            <el-icon
-              class="delete-btn"
-              @click.stop="handleDeleteConversation(conv.id || conv.conversationId)"
-            >
-              <Delete />
-            </el-icon>
-          </el-menu-item>
-        </el-menu>
-        <div v-if="conversations.length === 0" class="sidebar-empty">
-          暂无对话
-        </div>
+            <div class="sidebar-item__actions">
+              <button class="sidebar-item__btn" @click.stop="startEditTitle(conv)" title="编辑">
+                <WIcon name="edit" size="12" />
+              </button>
+              <button class="sidebar-item__btn" @click.stop="handleDeleteConversation(conv.id || conv.conversationId)" title="删除">
+                <WIcon name="delete" size="12" />
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
       <div class="sidebar-footer">
-        <el-button text @click="goToAdmin" v-if="isAdmin()">
-          <el-icon><Setting /></el-icon>
-          管理后台
-        </el-button>
-        <el-button text @click="handleLogout">
-          <el-icon><SwitchButton /></el-icon>
-          退出登录
-        </el-button>
+        <button v-if="isAdmin()" class="sidebar-footer__btn" @click="goToAdmin">
+          <WIcon name="settings" size="16" /> 管理后台
+        </button>
+        <button class="sidebar-footer__btn" @click="handleLogout">
+          <WIcon name="logout" size="16" /> 退出登录
+        </button>
       </div>
     </div>
 
@@ -61,9 +65,11 @@
     <div class="chat-main">
       <div class="messages-container" ref="messagesRef">
         <div v-if="messages.length === 0" class="messages-empty">
-          <el-icon :size="48" color="#c0c4cc"><ChatLineSquare /></el-icon>
-          <p>开始一个新的对话</p>
-          <p class="messages-hint">在下方输入您的问题，我将基于知识库为您解答</p>
+          <div class="messages-empty__icon">
+            <WIcon name="chat" :size="28" />
+          </div>
+          <p class="messages-empty__title">开始新的对话</p>
+          <p class="messages-empty__desc">在下方输入问题，我将基于知识库为您解答</p>
         </div>
         <template v-for="msg in messages" :key="msg.id || msg.timestamp">
           <ChatMessage :message="msg" />
@@ -80,38 +86,31 @@
       </div>
 
       <div class="input-area">
-        <el-input
-          v-model="inputText"
-          type="textarea"
-          :rows="2"
-          placeholder="输入您的问题，按 Enter 发送"
-          :disabled="streaming"
-          @keydown="handleKeydown"
-        />
-        <el-button
-          type="primary"
-          :icon="Promotion"
-          :loading="streaming"
-          style="margin-left: 12px; height: 56px"
-          @click="sendMessage"
-        >
-          发送
-        </el-button>
+        <div class="input-area__inner">
+          <textarea
+            v-model="inputText"
+            class="input-area__textarea"
+            placeholder="输入您的问题，Enter 发送，Shift+Enter 换行"
+            :disabled="streaming"
+            rows="2"
+            @keydown="handleKeydown"
+          ></textarea>
+          <button class="input-area__send" :disabled="streaming || !inputText.trim()" @click="sendMessage">
+            <WIcon name="send" size="18" />
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  Plus, ChatDotSquare, Delete, Setting, SwitchButton,
-  Promotion, ChatLineSquare, Edit
-} from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatMessage from '../components/ChatMessage.vue'
 import SourceReference from '../components/SourceReference.vue'
+import { WMessage } from '../components/ui/WMessage'
+import { WMessageBox } from '../components/ui/WMessageBox'
 import {
   chat, getMessages, listConversations,
   deleteConversation, createConversation, updateConversationTitle
@@ -127,14 +126,36 @@ const messages = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
 const streaming = ref(false)
-
 const editingConvId = ref(null)
 const editTitleText = ref('')
 const titleInputRef = ref(null)
 
-onMounted(() => {
-  loadConversations()
+const groupedConversations = computed(() => {
+  const now = new Date()
+  const today = now.toDateString()
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yDay = yesterday.toDateString()
+
+  const groups = { today: [], yesterday: [], earlier: [] }
+  conversations.value.forEach(conv => {
+    const t = conv.createTime || conv.updatedTime
+    if (!t) { groups.earlier.push(conv); return }
+    const d = new Date(t)
+    const ds = d.toDateString()
+    if (ds === today) groups.today.push(conv)
+    else if (ds === yDay) groups.yesterday.push(conv)
+    else groups.earlier.push(conv)
+  })
+
+  const result = []
+  if (groups.today.length) result.push({ label: '今天', items: groups.today })
+  if (groups.yesterday.length) result.push({ label: '昨天', items: groups.yesterday })
+  if (groups.earlier.length) result.push({ label: '更早', items: groups.earlier })
+  return result
 })
+
+onMounted(() => { loadConversations() })
 
 function handleKeydown(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -154,7 +175,7 @@ async function loadConversations() {
 }
 
 async function switchConversation(id) {
-  activeConversationId.value = id
+  activeConversationId.value = String(id)
   messages.value = []
   try {
     const res = await getMessages(id, { page: 1, size: 100 })
@@ -165,7 +186,15 @@ async function switchConversation(id) {
       messages.value = list.flatMap(r => {
         const msgs = [{ role: 'user', content: r.question, timestamp: r.createTime }]
         if (r.answer) {
-          msgs.push({ role: 'assistant', content: r.answer, reasoningContent: r.reasoningContent || null, sources: r.sources || [], timestamp: r.createTime })
+          let sources = []
+          if (r.sources) {
+            if (typeof r.sources === 'string') {
+              try { sources = JSON.parse(r.sources) } catch { sources = [] }
+            } else if (Array.isArray(r.sources)) {
+              sources = r.sources
+            }
+          }
+          msgs.push({ role: 'assistant', content: r.answer, reasoningContent: r.reasoningContent || null, sources, timestamp: r.createTime })
         }
         return msgs
       })
@@ -187,19 +216,21 @@ async function newConversation() {
 
 function startEditTitle(conv) {
   editingConvId.value = conv.id
-  editTitleText.value = conv.title
+  editTitleText.value = conv.title || ''
   nextTick(() => {
-    if (titleInputRef.value) titleInputRef.value.focus()
+    const el = document.querySelector('.sidebar-item__edit')
+    if (el) el.focus()
   })
 }
 
 async function saveEditTitle(conv) {
   if (editTitleText.value.trim() && editTitleText.value !== conv.title) {
+    const oldTitle = conv.title
     conv.title = editTitleText.value
     try {
       await updateConversationTitle(conv.id, { title: editTitleText.value })
     } catch {
-      conv.title = conv.title
+      conv.title = oldTitle
     }
   }
   editingConvId.value = null
@@ -253,13 +284,13 @@ async function sendMessage() {
 
 async function handleDeleteConversation(id) {
   try {
-    await ElMessageBox.confirm('确定删除该对话？', '提示', { type: 'warning' })
+    await WMessageBox({ title: '提示', message: '确定删除该对话？', type: 'warning' })
     await deleteConversation(id)
     conversations.value = conversations.value.filter(c => (c.id || c.conversationId) !== id)
     if (activeConversationId.value === String(id)) {
       newConversation()
     }
-    ElMessage.success('已删除')
+    WMessage.success('已删除')
   } catch {
     // cancelled
   }
@@ -282,55 +313,324 @@ function scrollToBottom() {
 </script>
 
 <style scoped>
-.chat-container { display: flex; height: 100vh; overflow: hidden; }
+.chat-page {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
 
+/* Sidebar */
 .chat-sidebar {
-  width: 280px; background: var(--color-sidebar-bg); border-right: 1px solid var(--color-border);
-  display: flex; flex-direction: column; flex-shrink: 0;
+  width: 280px;
+  background: var(--color-sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
 }
-.sidebar-header { padding: var(--space-md); border-bottom: 1px solid var(--color-border); }
-.sidebar-title { font-size: var(--font-size-lg); margin: 0 0 12px 0; color: var(--color-text); font-weight: 600; }
-.sidebar-conversations { flex: 1; overflow-y: auto; }
-.sidebar-conversations .el-menu { border-right: none; background: transparent; }
-.sidebar-conversations .el-menu-item {
-  font-size: var(--font-size-sm); color: var(--color-text-secondary); border-radius: var(--radius-sm);
-  margin: 2px 6px; height: 40px; line-height: 40px;
+
+.sidebar-header {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.sidebar-conversations .el-menu-item:hover { background: var(--color-sidebar-hover); color: var(--color-text); }
-.sidebar-conversations .el-menu-item.is-active {
-  background: var(--color-sidebar-active-bg); color: var(--color-sidebar-active-text); font-weight: 600;
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.sidebar-empty { text-align: center; color: var(--color-text-muted); padding: 24px; font-size: var(--font-size-sm); }
+.sidebar-brand__icon {
+  width: 28px;
+  height: 28px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+.sidebar-brand span {
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.sidebar-new-btn {
+  width: 100%;
+  padding: 10px 0;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9);
+  border: 1px dashed rgba(255,255,255,0.12);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all var(--duration-fast);
+  font-family: var(--font-body);
+}
+.sidebar-new-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.sidebar-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 12px 6px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 2px;
+  transition: all var(--duration-fast);
+  position: relative;
+}
+.sidebar-item:hover {
+  background: var(--color-sidebar-hover);
+  color: rgba(255,255,255,0.9);
+}
+.sidebar-item--active {
+  background: var(--color-sidebar-active);
+  color: #fff;
+}
+.sidebar-item__icon {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.4);
+}
+.sidebar-item--active .sidebar-item__icon {
+  color: var(--color-primary-300);
+}
+.sidebar-item__content {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-item__title {
+  font-size: var(--font-size-sm);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-item__edit {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--color-primary-500);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: var(--font-size-sm);
+  color: #fff;
+  outline: none;
+  font-family: var(--font-body);
+}
+.sidebar-item__actions {
+  display: none;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.sidebar-item:hover .sidebar-item__actions {
+  display: flex;
+}
+.sidebar-item__btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  transition: all var(--duration-fast);
+}
+.sidebar-item__btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.8);
+}
+
+.sidebar-empty {
+  text-align: center;
+  color: rgba(255,255,255,0.3);
+  padding: 24px;
+  font-size: var(--font-size-sm);
+}
+
 .sidebar-footer {
-  padding: 12px var(--space-md); border-top: 1px solid var(--color-border);
-  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-footer__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  font-family: var(--font-body);
+  width: 100%;
+  text-align: left;
+}
+.sidebar-footer__btn:hover {
+  background: var(--color-sidebar-hover);
+  color: rgba(255,255,255,0.8);
 }
 
-.conv-title-wrapper { display: flex; align-items: center; flex: 1; min-width: 0; }
-.conv-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.edit-icon { display: none; margin-left: 4px; font-size: 14px; color: var(--color-text-muted); cursor: pointer; flex-shrink: 0; }
-.conv-title-wrapper:hover .edit-icon { display: inline-flex; }
-.delete-btn { display: none; position: absolute; right: 8px; }
-.el-menu-item:hover .delete-btn { display: inline-flex; }
+/* Main Chat Area */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
 
-.chat-main { flex: 1; display: flex; flex-direction: column; background: var(--color-bg); }
-.messages-container { flex: 1; overflow-y: auto; padding: var(--space-lg); }
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px;
+}
+
 .messages-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
-.messages-empty p { margin: 8px 0 0; font-size: var(--font-size-lg); }
-.messages-hint { font-size: var(--font-size-sm) !important; margin-top: 4px !important; }
+.messages-empty__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--color-primary-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-500);
+  margin-bottom: 16px;
+}
+.messages-empty__title {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin: 0 0 4px;
+}
+.messages-empty__desc {
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 0;
+}
 
-.streaming-indicator { display: flex; gap: 4px; padding: 12px 0; align-items: center; }
-.streaming-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); animation: bounce 1.4s infinite ease-in-out both; }
+.streaming-indicator {
+  display: flex;
+  gap: 5px;
+  padding: 12px 0;
+  align-items: center;
+  margin-left: 48px;
+}
+.streaming-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary-400);
+  animation: bounce 1.4s infinite ease-in-out both;
+}
 .streaming-dot:nth-child(1) { animation-delay: -0.32s; }
 .streaming-dot:nth-child(2) { animation-delay: -0.16s; }
 .streaming-dot:nth-child(3) { animation-delay: 0s; }
 @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
+/* Input Area */
 .input-area {
-  padding: var(--space-md) var(--space-lg); background: var(--color-surface);
-  border-top: 1px solid var(--color-border); display: flex; align-items: flex-start;
+  padding: 16px 24px 24px;
+}
+.input-area__inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.input-area__textarea {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 14px 18px;
+  font-size: var(--font-size-base);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-surface);
+  resize: none;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+  min-height: 24px;
+  max-height: 120px;
+}
+.input-area__textarea:focus {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+}
+.input-area__textarea::placeholder {
+  color: var(--color-text-muted);
+}
+.input-area__textarea:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  background: var(--color-bg);
+}
+.input-area__send {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--gradient-primary);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.input-area__send:hover:not(:disabled) {
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(13,148,136,0.3);
+}
+.input-area__send:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.input-area__send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

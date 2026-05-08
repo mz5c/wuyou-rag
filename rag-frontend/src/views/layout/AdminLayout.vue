@@ -1,59 +1,33 @@
 <template>
   <div class="admin-layout">
-    <!-- Sidebar -->
     <div class="admin-sidebar">
-      <div class="sidebar-logo">RAG 管理后台</div>
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo__icon">W</div>
+          <span>管理后台</span>
+        </div>
+      </div>
       <div class="sidebar-menu">
-      <el-menu
-        :default-active="activeMenu"
-        router
-      >
-        <el-menu-item index="/admin/dashboard">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>仪表盘</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/documents">
-          <el-icon><Folder /></el-icon>
-          <span>文档管理</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/audit">
-          <el-icon><Tickets /></el-icon>
-          <span>审计日志</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/config">
-          <el-icon><Setting /></el-icon>
-          <span>系统配置</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/users">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-      </el-menu>
+        <WMenu :items="menuItems" :active-key="activeMenu" @select="handleMenuSelect" />
       </div>
     </div>
 
-    <!-- Main Content -->
     <div class="admin-main">
       <header class="admin-topbar">
         <div class="topbar-left">
-          <el-breadcrumb>
-            <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
-          </el-breadcrumb>
+          <WBreadcrumb :items="breadcrumbItems" @navigate="handleBreadcrumbNav" />
         </div>
         <div class="topbar-right">
-          <span class="user-name">
-            <el-icon><User /></el-icon>
-            {{ nickname || username }}
-          </span>
-          <el-button class="back-btn" text @click="goToChat">
-            <el-icon><ChatDotSquare /></el-icon>
-            返回对话
-          </el-button>
-          <el-button class="logout-btn" text @click="handleLogout">
-            <el-icon><SwitchButton /></el-icon>
-            退出
-          </el-button>
+          <button class="topbar-btn" @click="goToChat">
+            <WIcon name="chat" size="14" /> 返回对话
+          </button>
+          <div class="topbar-user">
+            <WAvatar :label="nickname || username" size="small" />
+            <span>{{ nickname || username }}</span>
+          </div>
+          <button class="topbar-btn topbar-btn--logout" @click="handleLogout">
+            <WIcon name="logout" size="14" /> 退出
+          </button>
         </div>
       </header>
       <main class="admin-content">
@@ -66,16 +40,20 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import {
-  DataAnalysis, Folder, Tickets, Setting, User,
-  ChatDotSquare, SwitchButton
-} from '@element-plus/icons-vue'
 import { useAuth } from '../../store/auth'
 
 const router = useRouter()
 const route = useRoute()
 const { user, logout } = useAuth()
 const { nickname, username } = user
+
+const menuItems = [
+  { key: '/admin/dashboard', label: '仪表盘', icon: 'dashboard' },
+  { key: '/admin/documents', label: '文档管理', icon: 'document' },
+  { key: '/admin/audit', label: '审计日志', icon: 'log' },
+  { key: '/admin/config', label: '系统配置', icon: 'settings' },
+  { key: '/admin/users', label: '用户管理', icon: 'users' }
+]
 
 const pageTitles = {
   '/admin/dashboard': '仪表盘',
@@ -86,7 +64,19 @@ const pageTitles = {
 }
 
 const activeMenu = computed(() => route.path)
-const currentPageTitle = computed(() => pageTitles[route.path] || '')
+
+const breadcrumbItems = computed(() => [
+  { label: '首页', to: '/admin/dashboard' },
+  { label: pageTitles[route.path] || '' }
+])
+
+function handleMenuSelect(key) {
+  router.push(key)
+}
+
+function handleBreadcrumbNav(to) {
+  router.push(to)
+}
 
 function goToChat() {
   router.push('/chat')
@@ -100,39 +90,89 @@ async function handleLogout() {
 
 <style scoped>
 .admin-layout { display: flex; min-height: 100vh; }
+
 .admin-sidebar {
-  width: 220px; background: var(--color-sidebar-bg); border-right: 1px solid var(--color-border);
-  display: flex; flex-direction: column; flex-shrink: 0;
+  width: 220px;
+  background: var(--color-sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.sidebar-header {
+  padding: 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .sidebar-logo {
-  padding: 20px 20px 16px; font-size: 16px; font-weight: 700;
-  color: var(--color-text); border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.sidebar-menu { flex: 1; padding: 8px 0; }
-.sidebar-menu .el-menu {
-  border-right: none; background: transparent;
+.sidebar-logo__icon {
+  width: 28px;
+  height: 28px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
 }
-.sidebar-menu .el-menu-item {
-  margin: 2px 8px; border-radius: var(--radius-sm); font-size: var(--font-size-base);
-  color: var(--color-text-secondary); height: 40px; line-height: 40px;
+.sidebar-logo span {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
 }
-.sidebar-menu .el-menu-item:hover { background: var(--color-sidebar-hover); color: var(--color-text); }
-.sidebar-menu .el-menu-item.is-active {
-  background: var(--color-sidebar-active-bg); color: var(--color-sidebar-active-text); font-weight: 600;
-}
+.sidebar-menu { flex: 1; padding: 12px 8px; }
+
 .admin-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
 .admin-topbar {
-  height: 56px; display: flex; align-items: center; justify-content: space-between;
-  padding: 0 var(--space-lg); background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border); flex-shrink: 0; box-shadow: var(--shadow-sm);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
-.topbar-left { display: flex; align-items: center; gap: var(--space-sm); }
-.topbar-left .title { font-size: var(--font-size-lg); font-weight: 600; color: var(--color-text); }
-.topbar-right { display: flex; align-items: center; gap: var(--space-md); }
-.topbar-right .user-name { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.admin-content { flex: 1; overflow-y: auto; padding: var(--space-lg); }
-.back-btn { font-size: var(--font-size-sm); color: var(--color-accent); cursor: pointer; text-decoration: none; }
-.back-btn:hover { color: var(--color-accent-hover); }
-.logout-btn { font-size: var(--font-size-sm); color: var(--color-text-secondary); cursor: pointer; }
-.logout-btn:hover { color: var(--color-danger); }
+
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+
+.topbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  font-family: var(--font-body);
+  background: var(--color-surface);
+}
+.topbar-btn:hover { border-color: var(--color-primary-300); color: var(--color-primary-600); }
+.topbar-btn--logout:hover { border-color: var(--color-danger); color: var(--color-danger); }
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+  background: var(--color-bg);
+}
 </style>

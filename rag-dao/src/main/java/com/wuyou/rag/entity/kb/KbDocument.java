@@ -1,6 +1,7 @@
 package com.wuyou.rag.entity.kb;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -46,6 +47,10 @@ public class KbDocument implements Serializable {
 
     /** 创建人用户ID */
     private Long createBy;
+
+    /** 创建人名称（非数据库字段） */
+    @TableField(exist = false)
+    private String creatorName;
 
     /** 创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

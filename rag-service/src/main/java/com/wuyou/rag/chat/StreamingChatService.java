@@ -175,6 +175,7 @@ public class StreamingChatService {
                 history.setQuestion(sensitiveWordFilter.filter(question));
                 history.setAnswer(fullAnswer);
                 history.setAnswerType("llm");
+                history.setReasoningContent(reasoningContent);
                 history.setUsedChunkIds(usedChunkIds);
                 history.setSources(sourcesJson);
                 history.setElapsedMs((int) elapsed);

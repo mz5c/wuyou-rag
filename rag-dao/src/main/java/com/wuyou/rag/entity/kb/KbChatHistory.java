@@ -2,8 +2,10 @@ package com.wuyou.rag.entity.kb;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -34,6 +36,9 @@ public class KbChatHistory implements Serializable {
     /** 回答类型：llm=模型生成, exact=缓存命中 */
     private String answerType = "llm";
 
+    /** 思考内容（reasoning） */
+    private String reasoningContent;
+
     /** 检索到的分块ID列表，逗号分隔 */
     private String usedChunkIds;
 
@@ -51,6 +56,11 @@ public class KbChatHistory implements Serializable {
 
     /** 消耗Token数 */
     private Integer tokensUsed;
+
+    /** 逻辑删除：0=正常, 1=已删除 */
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
 
     /** 创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

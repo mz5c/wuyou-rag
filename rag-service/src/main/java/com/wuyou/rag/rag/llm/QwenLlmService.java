@@ -99,7 +99,7 @@ public class QwenLlmService implements LlmService {
         if (cleanAnswer.isEmpty()) {
             cleanAnswer = rawResponse;
         }
-        return new ChatResult(cleanAnswer, reasoningContent);
+        return new ChatResult(cleanAnswer, reasoningContent, rawResponse);
     }
 
     String cleanAnswerForContext(String answer) {
@@ -110,6 +110,7 @@ public class QwenLlmService implements LlmService {
     @SuppressWarnings("unused")
     public ChatResult chatFallback(List<Message> messages, Throwable t) {
         log.error("LLM call failed after retries: {}", t.getMessage());
-        return new ChatResult("抱歉，AI 服务暂时不可用，请稍后再试。", null);
+        String error = "抱歉，AI 服务暂时不可用，请稍后再试。";
+        return new ChatResult(error, null, error);
     }
 }

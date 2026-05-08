@@ -6,172 +6,103 @@
     <div class="kb-section">
       <div class="section-header">
         <h3 class="section-title">知识库管理</h3>
-        <el-button type="primary" size="small" @click="openKbDialog()">新建知识库</el-button>
+        <WButton variant="primary" size="small" @click="openKbDialog()">新建知识库</WButton>
       </div>
-      <el-table :data="kbList" v-loading="kbLoading" size="small" style="margin-bottom:24px">
-        <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="创建时间" width="170" />
-        <el-table-column label="操作" width="140">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="openKbDialog(row)">编辑</el-button>
-            <el-button type="danger" link size="small" @click="handleDeleteKb(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div v-if="kbLoading" class="loading-state">
+        <WLoading type="dots" />
+      </div>
+      <WTable v-else :columns="kbColumns" :data="kbList" empty-text="暂无知识库">
+        <template #actions="{ row }">
+          <WButton variant="text" size="small" @click="openKbDialog(row)">编辑</WButton>
+          <WButton variant="text" size="small" @click="handleDeleteKb(row)">删除</WButton>
+        </template>
+      </WTable>
     </div>
 
     <!-- KB Dialog -->
-    <el-dialog v-model="kbDialogVisible" :title="kbEditingId ? '编辑知识库' : '新建知识库'" width="480px">
-      <el-form :model="kbForm" label-position="top">
-        <el-form-item label="名称" required>
-          <el-input v-model="kbForm.name" placeholder="请输入知识库名称" maxlength="128" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="kbForm.description" type="textarea" :rows="3" placeholder="请输入描述（选填）" maxlength="512" />
-        </el-form-item>
-      </el-form>
+    <WDialog v-model="kbDialogVisible" :title="kbEditingId ? '编辑知识库' : '新建知识库'" width="480px">
+      <div class="form-group">
+        <label class="form-label">名称</label>
+        <WInput v-model="kbForm.name" placeholder="请输入知识库名称" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">描述</label>
+        <WTextarea v-model="kbForm.description" :rows="3" placeholder="请输入描述（选填）" />
+      </div>
       <template #footer>
-        <el-button @click="kbDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="kbSaving" @click="handleSaveKb">保存</el-button>
+        <WButton @click="kbDialogVisible = false">取消</WButton>
+        <WButton variant="primary" :loading="kbSaving" @click="handleSaveKb">保存</WButton>
       </template>
-    </el-dialog>
+    </WDialog>
 
     <!-- Toolbar -->
-    <el-card class="toolbar-card" shadow="never">
-      <el-row :gutter="16" align="middle">
-        <el-col :span="6">
-          <el-select
-            v-model="selectedKbId"
-            placeholder="选择知识库"
-            style="width: 100%"
-            @change="loadDocuments"
-          >
-            <el-option
-              v-for="kb in knowledgeBases"
-              :key="kb.id"
-              :label="kb.name"
-              :value="kb.id"
-            />
-          </el-select>
-        </el-col>
-        <el-col :span="18" style="text-align: right">
-          <el-button type="primary" :icon="Upload" @click="showUploadDialog">
-            上传文档
-          </el-button>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- Table -->
-    <el-card shadow="never">
-      <el-table
-        :data="documents"
-        v-loading="loading"
-        stripe
-        style="width: 100%"
-      >
-        <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="fileType" label="类型" width="100">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.fileType || row.type || '未知' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="fileSize" label="大小" width="120">
-          <template #default="{ row }">
-            {{ formatSize(row.fileSize || row.size) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag
-              :type="statusType(row.status)"
-              size="small"
-            >
-              {{ statusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="creatorName" label="创建人" width="120" />
-        <el-table-column prop="createTime" label="时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              text
-              type="primary"
-              size="small"
-              @click="handleReprocess(row)"
-              :disabled="row.status === 'PROCESSING'"
-            >
-              重新处理
-            </el-button>
-            <el-button
-              text
-              type="danger"
-              size="small"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-wrapper" v-if="total > 0">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :total="total"
-          layout="prev, pager, next, total"
-          @change="loadDocuments"
-        />
+    <div class="toolbar-card">
+      <div class="toolbar-inner">
+        <div class="toolbar-left">
+          <WSelect v-model="selectedKbId" :options="kbOptions" placeholder="选择知识库" @change="loadDocuments" />
+        </div>
+        <div class="toolbar-right">
+          <WButton variant="primary" @click="showUploadDialog">
+            <WIcon name="upload" size="14" /> 上传文档
+          </WButton>
+        </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- Document Table -->
+    <div class="table-card">
+      <div v-if="loading" class="loading-state">
+        <WLoading type="dots" />
+      </div>
+      <WTable v-else :columns="docColumns" :data="documents" empty-text="暂无文档">
+        <template #fileType="{ row }">
+          <WTag variant="default" size="small">{{ row.fileType || row.type || '未知' }}</WTag>
+        </template>
+        <template #fileSize="{ row }">
+          {{ formatSize(row.fileSize || row.size) }}
+        </template>
+        <template #status="{ row }">
+          <WTag :variant="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</WTag>
+        </template>
+        <template #actions="{ row }">
+          <WButton variant="text" size="small" :disabled="row.status === 1" @click="handleReprocess(row)">重新处理</WButton>
+          <WButton variant="text" size="small" @click="handleDelete(row)">删除</WButton>
+        </template>
+      </WTable>
+
+      <WPagination v-if="total > 0" v-model="page" :total="total" :page-size="size" @change="loadDocuments" />
+    </div>
 
     <!-- Upload Dialog -->
-    <el-dialog v-model="uploadDialogVisible" title="上传文档" width="500px">
-      <el-form label-width="80px">
-        <el-form-item label="知识库">
-          <el-select v-model="uploadKbId" placeholder="选择知识库" style="width: 100%">
-            <el-option
-              v-for="kb in knowledgeBases"
-              :key="kb.id"
-              :label="kb.name"
-              :value="kb.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="文件">
-          <el-upload
-            ref="uploadRef"
-            :auto-upload="false"
-            :limit="1"
-            :on-change="handleFileChange"
-            :on-remove="() => { uploadFile = null }"
-          >
-            <el-button type="primary" plain>选择文件</el-button>
-            <template #tip>
-              <div style="font-size: 12px; color: #909399; margin-top: 4px">
-                支持 PDF、DOCX、TXT、MD 等格式
-              </div>
-            </template>
-          </el-upload>
-        </el-form-item>
-      </el-form>
+    <WDialog v-model="uploadDialogVisible" title="上传文档" width="500px">
+      <div class="form-group">
+        <label class="form-label">知识库</label>
+        <WSelect v-model="uploadKbId" :options="kbOptions" placeholder="选择知识库" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">文件</label>
+        <div class="upload-area">
+          <WButton variant="default" @click="triggerFileInput">
+            <WIcon name="upload" size="14" /> 选择文件
+          </WButton>
+          <input type="file" ref="fileInputRef" class="file-input-hidden" accept=".pdf,.docx,.txt,.md" @change="handleFileChange" />
+          <span v-if="uploadFile" class="upload-file-name">{{ uploadFile.name }}</span>
+          <button v-if="uploadFile" type="button" class="upload-clear" @click="clearUploadFile">×</button>
+          <div class="upload-tip">支持 PDF、DOCX、TXT、MD 等格式</div>
+        </div>
+      </div>
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="handleUpload">
-          上传
-        </el-button>
+        <WButton @click="uploadDialogVisible = false">取消</WButton>
+        <WButton variant="primary" :loading="uploading" @click="handleUpload">上传</WButton>
       </template>
-    </el-dialog>
+    </WDialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Upload } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { WMessage } from '../../components/ui/WMessage'
+import { WMessageBox } from '../../components/ui/WMessageBox'
 import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '../../api/knowledge'
 import { uploadDocument, listDocuments, deleteDocument, reprocessDocument } from '../../api/document'
 
@@ -187,7 +118,7 @@ const total = ref(0)
 const uploadDialogVisible = ref(false)
 const uploadKbId = ref('')
 const uploadFile = ref(null)
-const uploadRef = ref(null)
+const fileInputRef = ref(null)
 const uploading = ref(false)
 
 // KB management
@@ -197,6 +128,27 @@ const kbDialogVisible = ref(false)
 const kbEditingId = ref(null)
 const kbSaving = ref(false)
 const kbForm = reactive({ name: '', description: '' })
+
+const kbColumns = [
+  { key: 'name', label: '名称' },
+  { key: 'description', label: '描述' },
+  { key: 'createTime', label: '创建时间', width: '170px' },
+  { key: 'actions', label: '操作', width: '140px' }
+]
+
+const docColumns = [
+  { key: 'title', label: '标题' },
+  { key: 'fileType', label: '类型', width: '100px' },
+  { key: 'fileSize', label: '大小', width: '120px' },
+  { key: 'status', label: '状态', width: '120px' },
+  { key: 'creatorName', label: '创建人', width: '120px' },
+  { key: 'createTime', label: '时间', width: '180px' },
+  { key: 'actions', label: '操作', width: '200px' }
+]
+
+const kbOptions = computed(() =>
+  knowledgeBases.value.map(kb => ({ value: kb.id, label: kb.name }))
+)
 
 onMounted(async () => {
   await loadKnowledgeBases()
@@ -238,24 +190,34 @@ function showUploadDialog() {
   uploadDialogVisible.value = true
 }
 
-function handleFileChange(uploadFileObj) {
-  uploadFile.value = uploadFileObj.raw
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+function handleFileChange(e) {
+  const file = e.target.files[0]
+  uploadFile.value = file || null
+}
+
+function clearUploadFile() {
+  uploadFile.value = null
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
 async function handleUpload() {
   if (!uploadKbId.value) {
-    ElMessage.warning('请选择知识库')
+    WMessage.warning('请选择知识库')
     return
   }
   if (!uploadFile.value) {
-    ElMessage.warning('请选择文件')
+    WMessage.warning('请选择文件')
     return
   }
 
   uploading.value = true
   try {
     await uploadDocument(uploadKbId.value, uploadFile.value)
-    ElMessage.success('上传成功')
+    WMessage.success('上传成功')
     uploadDialogVisible.value = false
     await loadDocuments()
   } catch {
@@ -268,7 +230,7 @@ async function handleUpload() {
 async function handleReprocess(row) {
   try {
     await reprocessDocument(row.id)
-    ElMessage.success('已重新加入处理队列')
+    WMessage.success('已重新加入处理队列')
     await loadDocuments()
   } catch {
     // error handled by interceptor
@@ -277,9 +239,9 @@ async function handleReprocess(row) {
 
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm(`确定删除文档「${row.title}」？`, '提示', { type: 'warning' })
+    await WMessageBox({ title: '提示', message: `确定删除文档「${row.title}」？`, type: 'warning' })
     await deleteDocument(row.id)
-    ElMessage.success('已删除')
+    WMessage.success('已删除')
     await loadDocuments()
   } catch {
     // cancelled or error
@@ -311,17 +273,17 @@ function openKbDialog(row) {
 
 async function handleSaveKb() {
   if (!kbForm.name.trim()) {
-    ElMessage.warning('请输入知识库名称')
+    WMessage.warning('请输入知识库名称')
     return
   }
   kbSaving.value = true
   try {
     if (kbEditingId.value) {
       await updateKnowledgeBase(kbEditingId.value, { name: kbForm.name, description: kbForm.description })
-      ElMessage.success('知识库已更新')
+      WMessage.success('知识库已更新')
     } else {
       await createKnowledgeBase({ name: kbForm.name, description: kbForm.description })
-      ElMessage.success('知识库已创建')
+      WMessage.success('知识库已创建')
     }
     kbDialogVisible.value = false
     await loadKnowledgeBases()
@@ -332,9 +294,9 @@ async function handleSaveKb() {
 
 async function handleDeleteKb(row) {
   try {
-    await ElMessageBox.confirm(`确定删除知识库「${row.name}」吗？`, '确认删除', { type: 'warning' })
+    await WMessageBox({ title: '确认删除', message: `确定删除知识库「${row.name}」吗？`, type: 'warning' })
     await deleteKnowledgeBase(row.id)
-    ElMessage.success('知识库已删除')
+    WMessage.success('知识库已删除')
     await loadKnowledgeBases()
   } catch {
     // cancelled or error
@@ -349,23 +311,13 @@ function formatSize(bytes) {
 }
 
 function statusType(status) {
-  const map = {
-    COMPLETED: 'success',
-    PROCESSING: 'warning',
-    FAILED: 'danger',
-    PENDING: 'info'
-  }
+  const map = { 2: 'success', 1: 'warning', 3: 'danger', 0: 'info' }
   return map[status] || 'info'
 }
 
 function statusLabel(status) {
-  const map = {
-    COMPLETED: '已完成',
-    PROCESSING: '处理中',
-    FAILED: '失败',
-    PENDING: '待处理'
-  }
-  return map[status] || status || '未知'
+  const map = { 2: '已完成', 1: '处理中', 3: '失败', 0: '待处理' }
+  return map[status] !== undefined ? map[status] : String(status || '未知')
 }
 </script>
 
@@ -380,9 +332,32 @@ function statusLabel(status) {
 }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-title { font-size: var(--font-size-lg); color: var(--color-text); margin: 0; font-weight: 600; }
+
 .toolbar-card {
   margin-bottom: 16px; background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md); padding: 16px 20px; box-shadow: var(--shadow-sm);
 }
-.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
+.toolbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.toolbar-left { width: 240px; }
+.toolbar-right { flex-shrink: 0; }
+
+.table-card {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-sm);
+}
+
+.loading-state { display: flex; justify-content: center; align-items: center; padding: 48px 0; gap: 8px; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text); margin-bottom: 6px; }
+
+.upload-area { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.file-input-hidden { display: none; }
+.upload-file-name { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.upload-clear {
+  border: none; background: none; cursor: pointer; padding: 0 4px;
+  color: var(--color-text-muted); font-size: 16px; line-height: 1;
+}
+.upload-clear:hover { color: var(--color-danger); }
+.upload-tip { width: 100%; font-size: 12px; color: var(--color-text-muted); }
 </style>

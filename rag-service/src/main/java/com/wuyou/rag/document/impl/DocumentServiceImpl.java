@@ -8,10 +8,12 @@ import com.wuyou.rag.document.storage.FileStorageService;
 import com.wuyou.rag.entity.kb.KbChunk;
 import com.wuyou.rag.entity.kb.KbDocument;
 import com.wuyou.rag.entity.kb.KbKnowledgeBase;
+import com.wuyou.rag.entity.sys.SysUser;
 import com.wuyou.rag.exception.ErrorCode;
 import com.wuyou.rag.mapper.KbChunkMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.mapper.KbKnowledgeBaseMapper;
+import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.rag.vector.VectorService;
 import com.wuyou.rag.result.Result;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +22,13 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,6 +41,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final KbDocumentMapper kbDocumentMapper;
     private final KbKnowledgeBaseMapper kbKnowledgeBaseMapper;
     private final KbChunkMapper kbChunkMapper;
+    private final SysUserMapper sysUserMapper;
     private final FileStorageService fileStorageService;
     private final VectorService vectorService;
     private final RabbitTemplate rabbitTemplate;
@@ -114,6 +121,26 @@ public class DocumentServiceImpl implements DocumentService {
                 Wrappers.<KbDocument>lambdaQuery()
                         .eq(KbDocument::getKbId, kbId)
                         .orderByDesc(KbDocument::getCreateTime));
+
+        // Batch query creator names
+        List<KbDocument> records = pageResult.getRecords();
+        if (!records.isEmpty()) {
+            Set<Long> userIds = records.stream()
+                    .map(KbDocument::getCreateBy)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!userIds.isEmpty()) {
+                List<SysUser> users = sysUserMapper.selectBatchIds(userIds);
+                Map<Long, String> userNames = new HashMap<>();
+                for (SysUser u : users) {
+                    userNames.put(u.getId(), u.getNickname() != null ? u.getNickname() : u.getUsername());
+                }
+                for (KbDocument doc : records) {
+                    doc.setCreatorName(userNames.get(doc.getCreateBy()));
+                }
+            }
+        }
+
         return Result.success(pageResult);
     }
 

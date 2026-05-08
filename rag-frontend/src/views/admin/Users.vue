@@ -4,117 +4,92 @@
 
     <div class="section-header">
       <h3 class="section-title">用户列表</h3>
-      <el-button type="primary" size="small" @click="openCreateDialog">新增用户</el-button>
+      <WButton variant="primary" size="small" @click="openCreateDialog">新增用户</WButton>
     </div>
 
-    <el-card shadow="never">
-      <el-table :data="users" v-loading="loading" stripe style="width: 100%">
-        <el-table-column prop="username" label="用户名" width="150" />
-        <el-table-column prop="nickname" label="昵称" width="150" />
-        <el-table-column prop="role" label="角色" width="120">
-          <template #default="{ row }">
-            <el-tag :type="row.role === 'ADMIN' ? 'danger' : 'info'" size="small">
-              {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
-              {{ row.status === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createTime" label="注册时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button text type="primary" size="small" @click="openEditDialog(row)">
-              编辑
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-wrapper" v-if="total > 0">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :total="total"
-          layout="prev, pager, next, total"
-          @change="loadUsers"
-        />
+    <div class="table-card">
+      <div v-if="loading" class="loading-state">
+        <WLoading type="dots" />
       </div>
-    </el-card>
+      <WTable v-else :columns="columns" :data="users" empty-text="暂无用户">
+        <template #role="{ row }">
+          <WTag :variant="row.role === 'ADMIN' ? 'danger' : 'info'" size="small">
+            {{ row.role === 'ADMIN' ? '管理员' : '普通用户' }}
+          </WTag>
+        </template>
+        <template #status="{ row }">
+          <WTag :variant="row.status === 1 ? 'success' : 'info'" size="small">
+            {{ row.status === 1 ? '启用' : '禁用' }}
+          </WTag>
+        </template>
+        <template #actions="{ row }">
+          <WButton variant="text" size="small" @click="openEditDialog(row)">编辑</WButton>
+        </template>
+      </WTable>
+
+      <WPagination v-if="total > 0" v-model="page" :total="total" :page-size="size" @change="loadUsers" />
+    </div>
 
     <!-- Edit Dialog -->
-    <el-dialog v-model="editDialogVisible" title="编辑用户" width="500px">
-      <el-form :model="editForm" label-width="80px">
-        <el-form-item label="用户名">
-          <el-input v-model="editForm.username" disabled />
-        </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="editForm.nickname" />
-        </el-form-item>
-        <el-form-item label="角色">
-          <el-select v-model="editForm.role" style="width: 100%">
-            <el-option label="管理员" value="ADMIN" />
-            <el-option label="普通用户" value="USER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch
-            v-model="editForm.statusActive"
-            active-text="启用"
-            inactive-text="禁用"
-          />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input
-            v-model="editForm.password"
-            type="password"
-            placeholder="留空不修改"
-            show-password
-          />
-        </el-form-item>
-      </el-form>
+    <WDialog v-model="editDialogVisible" title="编辑用户" width="500px">
+      <div class="form-group">
+        <label class="form-label">用户名</label>
+        <WInput v-model="editForm.username" disabled />
+      </div>
+      <div class="form-group">
+        <label class="form-label">昵称</label>
+        <WInput v-model="editForm.nickname" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">角色</label>
+        <WSelect v-model="editForm.role" :options="roleOptions" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">状态</label>
+        <div class="switch-row">
+          <WSwitch v-model="editForm.statusActive" />
+          <span class="switch-label">{{ editForm.statusActive ? '启用' : '禁用' }}</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <WInput v-model="editForm.password" type="password" placeholder="留空不修改" />
+      </div>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSaveUser">
-          保存
-        </el-button>
+        <WButton @click="editDialogVisible = false">取消</WButton>
+        <WButton variant="primary" :loading="saving" @click="handleSaveUser">保存</WButton>
       </template>
-    </el-dialog>
+    </WDialog>
 
     <!-- Create User Dialog -->
-    <el-dialog v-model="createDialogVisible" title="新增用户" width="460px">
-      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-position="top">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="createForm.username" placeholder="2-32位字母、数字或下划线" />
-        </el-form-item>
-        <el-form-item label="昵称" prop="nickname">
-          <el-input v-model="createForm.nickname" placeholder="请输入昵称" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="createForm.password" type="password" show-password placeholder="6-32位密码" />
-        </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="createForm.role" style="width:100%">
-            <el-option label="普通用户" value="USER" />
-            <el-option label="管理员" value="ADMIN" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+    <WDialog v-model="createDialogVisible" title="新增用户" width="460px">
+      <div class="form-group">
+        <label class="form-label">用户名</label>
+        <WInput v-model="createForm.username" placeholder="2-32位字母、数字或下划线" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">昵称</label>
+        <WInput v-model="createForm.nickname" placeholder="请输入昵称" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <WInput v-model="createForm.password" type="password" placeholder="6-32位密码" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">角色</label>
+        <WSelect v-model="createForm.role" :options="roleOptions" />
+      </div>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="handleCreateUser">创建</el-button>
+        <WButton @click="createDialogVisible = false">取消</WButton>
+        <WButton variant="primary" :loading="creating" @click="handleCreateUser">创建</WButton>
       </template>
-    </el-dialog>
+    </WDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { WMessage } from '../../components/ui/WMessage'
 import { getUsers, updateUser, createUser } from '../../api/admin'
 
 const users = ref([])
@@ -136,24 +111,26 @@ const editForm = reactive({
 
 const createDialogVisible = ref(false)
 const creating = ref(false)
-const createFormRef = ref(null)
 const createForm = reactive({
   username: '',
   nickname: '',
   password: '',
   role: 'USER'
 })
-const createRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 2, max: 32, message: '用户名长度为2-32位', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 32, message: '密码长度为6-32位', trigger: 'blur' }
-  ]
-}
+
+const columns = [
+  { key: 'username', label: '用户名', width: '150px' },
+  { key: 'nickname', label: '昵称', width: '150px' },
+  { key: 'role', label: '角色', width: '120px' },
+  { key: 'status', label: '状态', width: '100px' },
+  { key: 'createTime', label: '注册时间', width: '180px' },
+  { key: 'actions', label: '操作', width: '200px' }
+]
+
+const roleOptions = [
+  { value: 'USER', label: '普通用户' },
+  { value: 'ADMIN', label: '管理员' }
+]
 
 onMounted(() => {
   loadUsers()
@@ -196,7 +173,7 @@ async function handleSaveUser() {
       data.password = editForm.password
     }
     await updateUser(editForm.id, data)
-    ElMessage.success('用户信息已更新')
+    WMessage.success('用户信息已更新')
     editDialogVisible.value = false
     await loadUsers()
   } catch {
@@ -214,13 +191,21 @@ function openCreateDialog() {
   createDialogVisible.value = true
 }
 
+function validateCreateForm() {
+  if (!createForm.username.trim()) { WMessage.warning('请输入用户名'); return false }
+  if (!/^[a-zA-Z0-9_]{2,32}$/.test(createForm.username)) { WMessage.warning('用户名长度为2-32位，只能包含字母、数字和下划线'); return false }
+  if (!createForm.password) { WMessage.warning('请输入密码'); return false }
+  if (createForm.password.length < 6 || createForm.password.length > 32) { WMessage.warning('密码长度为6-32位'); return false }
+  if (!createForm.nickname.trim()) { WMessage.warning('请输入昵称'); return false }
+  return true
+}
+
 async function handleCreateUser() {
-  const valid = await createFormRef.value.validate().catch(() => false)
-  if (!valid) return
+  if (!validateCreateForm()) return
   creating.value = true
   try {
     await createUser({ ...createForm })
-    ElMessage.success('用户已创建')
+    WMessage.success('用户已创建')
     createDialogVisible.value = false
     await loadUsers()
   } catch {
@@ -238,5 +223,16 @@ async function handleCreateUser() {
 }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-title { font-size: var(--font-size-lg); color: var(--color-text); margin: 0; font-weight: 600; }
-.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+.table-card {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-sm);
+}
+.loading-state { display: flex; justify-content: center; padding: 48px 0; }
+
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text); margin-bottom: 6px; }
+
+.switch-row { display: flex; align-items: center; gap: 10px; }
+.switch-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 </style>

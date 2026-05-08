@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS kb_conversation (
     title          VARCHAR(256) DEFAULT '新对话',
     kb_id          BIGINT COMMENT '关联知识库ID（可空）',
     message_count  INT          DEFAULT 0,
+    deleted        TINYINT      NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id)
@@ -79,12 +80,14 @@ CREATE TABLE IF NOT EXISTS kb_chat_history (
     question         TEXT         NOT NULL,
     answer           LONGTEXT,
     answer_type      VARCHAR(8)   DEFAULT 'llm' COMMENT '回答类型：llm=模型生成, exact=缓存命中',
+    reasoning_content LONGTEXT COMMENT 'LLM 思考内容',
     used_chunk_ids   TEXT,
     sources          JSON,
     feedback         TINYINT COMMENT '用户反馈：1=点赞, 0=点踩, NULL=未评价',
     feedback_comment VARCHAR(256),
     elapsed_ms       INT,
     tokens_used      INT,
+    deleted          TINYINT      NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除',
     create_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_conv_id (conversation_id),
     INDEX idx_user_id (user_id)
@@ -134,3 +137,11 @@ INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
 ('search.top_k', '5', '检索返回 TOP K'),
 ('cache.ttl_hot_qa', '3600', '热点问答缓存秒数'),
 ('sensitive_words', '', '敏感词列表（逗号分隔）');
+
+-- =====================================================
+-- 迁移脚本（对已有数据库增量添加字段，新库已含在 CREATE TABLE 中）
+-- 重复执行会报字段已存在的错，但 spring.sql.init.continue-on-error=true 会忽略
+-- =====================================================
+ALTER TABLE kb_conversation ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除';
+ALTER TABLE kb_chat_history ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除：0=正常, 1=已删除';
+ALTER TABLE kb_chat_history ADD COLUMN reasoning_content LONGTEXT COMMENT 'LLM 思考内容';

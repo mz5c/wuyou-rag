@@ -2,53 +2,40 @@
   <div class="config-page">
     <h2 class="page-title">系统配置</h2>
 
-    <el-card shadow="never">
-      <el-table :data="configs" v-loading="loading" stripe style="width: 100%">
-        <el-table-column prop="configKey" label="配置键" min-width="200">
-          <template #default="{ row }">
-            <code class="config-key">{{ row.configKey || row.key }}</code>
+    <div class="table-card">
+      <div v-if="loading" class="loading-state">
+        <WLoading type="dots" />
+      </div>
+      <WTable v-else :columns="columns" :data="configs" empty-text="暂无配置">
+        <template #configKey="{ row }">
+          <code class="config-key">{{ row.configKey || row.key }}</code>
+        </template>
+        <template #configValue="{ row }">
+          <WTextarea
+            v-if="editingId === (row.id || row.configKey)"
+            v-model="editValue"
+            :rows="2"
+          />
+          <span v-else>{{ row.configValue || row.value }}</span>
+        </template>
+        <template #description="{ row }">
+          {{ row.description }}
+        </template>
+        <template #actions="{ row }">
+          <template v-if="editingId === (row.id || row.configKey)">
+            <WButton variant="primary" size="small" :loading="saving" @click="saveConfig(row)">保存</WButton>
+            <WButton size="small" @click="cancelEdit">取消</WButton>
           </template>
-        </el-table-column>
-        <el-table-column label="配置值" min-width="300">
-          <template #default="{ row }">
-            <el-input
-              v-if="editingId === (row.id || row.configKey)"
-              v-model="editValue"
-              type="textarea"
-              :rows="2"
-              size="small"
-            />
-            <span v-else>{{ row.configValue || row.value }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
-        <el-table-column label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <template v-if="editingId === (row.id || row.configKey)">
-              <el-button type="primary" size="small" :loading="saving" @click="saveConfig(row)">
-                保存
-              </el-button>
-              <el-button size="small" @click="cancelEdit">取消</el-button>
-            </template>
-            <el-button
-              v-else
-              text
-              type="primary"
-              size="small"
-              @click="startEdit(row)"
-            >
-              编辑
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+          <WButton v-else variant="text" size="small" @click="startEdit(row)">编辑</WButton>
+        </template>
+      </WTable>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { WMessage } from '../../components/ui/WMessage'
 import { getConfigs, updateConfig } from '../../api/admin'
 
 const configs = ref([])
@@ -56,6 +43,13 @@ const loading = ref(false)
 const editingId = ref(null)
 const editValue = ref('')
 const saving = ref(false)
+
+const columns = [
+  { key: 'configKey', label: '配置键' },
+  { key: 'configValue', label: '配置值' },
+  { key: 'description', label: '说明' },
+  { key: 'actions', label: '操作', width: '160px' }
+]
 
 onMounted(() => {
   loadConfigs()
@@ -93,7 +87,7 @@ async function saveConfig(row) {
       configValue: editValue.value,
       description: row.description
     })
-    ElMessage.success('配置已更新')
+    WMessage.success('配置已更新')
     editingId.value = null
     await loadConfigs()
   } catch {
@@ -109,8 +103,14 @@ async function saveConfig(row) {
 .page-title {
   font-size: var(--font-size-xl); color: var(--color-text); margin: 0 0 var(--space-lg) 0; font-weight: 600;
 }
+.table-card {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-sm);
+}
+.loading-state { display: flex; justify-content: center; padding: 48px 0; }
+
 .config-key {
-  font-size: var(--font-size-sm); color: var(--color-accent); background: var(--color-accent-light);
+  font-size: var(--font-size-sm); color: var(--color-primary-700); background: var(--color-primary-50);
   padding: 2px 6px; border-radius: var(--radius-sm); font-family: 'SF Mono', 'Fira Code', monospace;
 }
 </style>

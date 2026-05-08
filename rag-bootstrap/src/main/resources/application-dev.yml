@@ -8,6 +8,7 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
+      continue-on-error: true
   data:
     redis:
       host: localhost

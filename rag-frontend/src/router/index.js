@@ -70,6 +70,18 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.guest && token) {
     next('/chat')
+  } else if (to.meta.requiresAdmin) {
+    try {
+      const raw = localStorage.getItem('user_info')
+      const user = raw ? JSON.parse(raw) : null
+      if (!user || user.role !== 'ADMIN') {
+        next('/chat')
+      } else {
+        next()
+      }
+    } catch {
+      next('/chat')
+    }
   } else {
     next()
   }

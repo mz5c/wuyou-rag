@@ -1,47 +1,28 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-header">
-        <h1 class="login-title">RAG 智能知识库</h1>
-        <p class="login-subtitle">登录您的账户</p>
+  <div class="login-page">
+    <div class="login-brand">
+      <div class="login-brand__content">
+        <div class="login-brand__logo">
+          <div class="login-brand__logo-icon">W</div>
+          <span>Wuyou RAG</span>
+        </div>
+        <h1 class="login-brand__title">企业级智能知识库</h1>
+        <p class="login-brand__desc">基于 RAG 技术，让您的文档资产<br>转化为可对话的智慧</p>
+        <p class="login-brand__copyright">&copy; 2026 Wuyou RAG</p>
       </div>
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="0"
-        size="large"
-        @keyup.enter="handleLogin"
-      >
-        <el-form-item prop="username">
-          <el-input
-            v-model="form.username"
-            placeholder="用户名"
-            :prefix-icon="User"
-          />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="密码"
-            show-password
-            :prefix-icon="Lock"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button
-            type="primary"
-            :loading="loading"
-            style="width: 100%"
-            @click="handleLogin"
-          >
-            登 录
-          </el-button>
-        </el-form-item>
-      </el-form>
-      <div v-if="errorMsg" class="login-error">{{ errorMsg }}</div>
-      <p class="auth-link">没有账号？<router-link to="/register">立即注册</router-link></p>
+    </div>
+    <div class="login-form">
+      <div class="login-form__inner">
+        <h2 class="login-form__title">欢迎回来</h2>
+        <p class="login-form__subtitle">登录您的账户</p>
+        <div class="login-form__fields">
+          <WInput v-model="form.username" placeholder="用户名" prefix-icon="user" />
+          <WInput v-model="form.password" type="password" placeholder="密码" prefix-icon="lock" />
+          <p v-if="errorMsg" class="login-form__error">{{ errorMsg }}</p>
+          <WButton variant="primary" block :loading="loading" @click="handleLogin">登 录</WButton>
+        </div>
+        <p class="login-form__switch">没有账号？<router-link to="/register">立即注册</router-link></p>
+      </div>
     </div>
   </div>
 </template>
@@ -49,14 +30,12 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock } from '@element-plus/icons-vue'
 import { login } from '../api/auth'
 import { useAuth } from '../store/auth'
 
 const router = useRouter()
 const { setUser } = useAuth()
 
-const formRef = ref(null)
 const loading = ref(false)
 const errorMsg = ref('')
 
@@ -65,14 +44,11 @@ const form = reactive({
   password: ''
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
-
 async function handleLogin() {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
+  if (!form.username.trim() || !form.password.trim()) {
+    errorMsg.value = '请填写用户名和密码'
+    return
+  }
 
   loading.value = true
   errorMsg.value = ''
@@ -104,20 +80,136 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.login-container {
-  display: flex; justify-content: center; align-items: center; min-height: 100vh;
-  background: linear-gradient(135deg, #eff6ff 0%, #f1f5f9 100%);
+.login-page {
+  display: flex;
+  min-height: 100vh;
 }
-.login-card {
-  width: 400px; padding: 40px; background: var(--color-surface);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  border: 1px solid var(--color-border);
+
+/* Brand panel */
+.login-brand {
+  flex: 1;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #134e4a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
-.login-header { text-align: center; margin-bottom: 32px; }
-.login-title { font-size: var(--font-size-2xl); color: var(--color-text); margin: 0 0 8px 0; font-weight: 700; }
-.login-subtitle { font-size: var(--font-size-base); color: var(--color-text-secondary); margin: 0; }
-.login-error { color: var(--color-danger); font-size: var(--font-size-sm); text-align: center; margin-top: 12px; }
-.auth-link { text-align: center; margin-top: 16px; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.auth-link a { color: var(--color-accent); text-decoration: none; font-weight: 500; }
-.auth-link a:hover { color: var(--color-accent-hover); }
+.login-brand::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(13,148,136,0.15), transparent);
+  top: -200px;
+  right: -200px;
+}
+.login-brand::after {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(13,148,136,0.1), transparent);
+  bottom: -100px;
+  left: -100px;
+}
+.login-brand__content {
+  text-align: center;
+  z-index: 1;
+}
+.login-brand__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.login-brand__logo-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 24px;
+}
+.login-brand__logo span {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-heading);
+}
+.login-brand__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+}
+.login-brand__desc {
+  font-size: 15px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.7;
+  margin: 0 0 48px;
+}
+.login-brand__copyright {
+  font-size: 12px;
+  color: rgba(255,255,255,0.25);
+}
+
+/* Form panel */
+.login-form {
+  width: 440px;
+  min-width: 440px;
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.login-form__inner {
+  width: 100%;
+  max-width: 340px;
+}
+.login-form__title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+}
+.login-form__subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 36px;
+}
+.login-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.login-form__error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin: 0;
+}
+.login-form__switch {
+  text-align: center;
+  margin-top: 24px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.login-form__switch a {
+  color: var(--color-primary-600);
+  font-weight: 500;
+  text-decoration: none;
+}
+.login-form__switch a:hover {
+  color: var(--color-primary-500);
+}
 </style>

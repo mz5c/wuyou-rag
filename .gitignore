@@ -47,7 +47,6 @@ Thumbs.db
 
 # Logs
 logs/
-*.log
 
 # Database
 *.db
@@ -82,4 +81,3 @@ npm-debug.log*
 
 # Frontend build output
 rag-frontend/dist/
-docs/

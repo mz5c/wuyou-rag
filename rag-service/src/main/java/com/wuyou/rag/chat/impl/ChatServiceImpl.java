@@ -240,6 +240,7 @@ public class ChatServiceImpl implements ChatService {
             history.setQuestion(sensitiveWordFilter.filter(question));
             history.setAnswer(answer);
             history.setAnswerType("llm");
+            history.setReasoningContent(reasoningContent);
             history.setUsedChunkIds(usedChunkIds);
             history.setSources(sourcesJson);
             history.setElapsedMs((int) elapsed);

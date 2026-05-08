@@ -104,7 +104,11 @@ public class MilvusVectorService implements VectorService {
         for (int i = 0; i < chunkIds.size(); i++) {
             JSONObject row = new JSONObject();
             row.put("chunk_id", chunkIds.get(i));
-            row.put("embedding", embeddings.get(i));
+            List<Float> embeddingList = new ArrayList<>(embeddings.get(i).length);
+            for (float v : embeddings.get(i)) {
+                embeddingList.add(v);
+            }
+            row.put("embedding", embeddingList);
             rows.add(row);
         }
 

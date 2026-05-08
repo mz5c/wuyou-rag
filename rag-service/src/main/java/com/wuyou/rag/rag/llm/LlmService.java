@@ -8,5 +8,5 @@ public interface LlmService {
 
     record Message(String role, String content) {}
 
-    record ChatResult(String answer, String reasoningContent) {}
+    record ChatResult(String answer, String reasoningContent, String rawResponse) {}
 }
