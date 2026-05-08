@@ -9,6 +9,7 @@
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
+    aria-hidden="true"
     :style="{ color: color }"
   >
     <path :d="path" />
@@ -25,7 +26,13 @@ const props = defineProps({
   color: { type: String, default: undefined }
 })
 
-const path = computed(() => Icons[props.name] || '')
+const path = computed(() => {
+  if (!Icons[props.name]) {
+    console.warn('[WIcon] Unknown icon name:', props.name)
+    return ''
+  }
+  return Icons[props.name]
+})
 </script>
 
 <style scoped>
