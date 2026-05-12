@@ -49,6 +49,7 @@ minio:
 
 resilience4j:
   circuitbreaker:
+    circuit-breaker-aspect-order: 2
     configs:
       default:
         sliding-window-size: 10
@@ -59,6 +60,7 @@ resilience4j:
       llmService:
         base-config: default
   retry:
+    retry-aspect-order: 3
     configs:
       default:
         max-attempts: 3
@@ -68,6 +70,7 @@ resilience4j:
       llmService:
         base-config: default
   ratelimiter:
+    rate-limiter-aspect-order: 1
     configs:
       default:
         limit-for-period: 10
