@@ -71,7 +71,7 @@ public class EsSearchService {
     private void createIndexIfNotExists() {
         try {
             String url = esUrl + "/" + INDEX_NAME;
-            restTemplate.head(url, Void.class);
+            restTemplate.execute(url, org.springframework.http.HttpMethod.HEAD, null, null);
             log.info("ES index already exists: {}", INDEX_NAME);
         } catch (Exception e) {
             try {

@@ -16,7 +16,7 @@ import com.wuyou.rag.mapper.KbKnowledgeBaseMapper;
 import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.rag.vector.VectorService;
 import com.wuyou.rag.result.Result;
-import com.wuyou.rag.search.EsSearchService;
+import com.wuyou.rag.rag.search.EsSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

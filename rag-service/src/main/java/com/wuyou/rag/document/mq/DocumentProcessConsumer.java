@@ -13,7 +13,7 @@ import com.wuyou.rag.mapper.KbChunkMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.rag.embedding.EmbeddingService;
 import com.wuyou.rag.rag.vector.VectorService;
-import com.wuyou.rag.search.EsSearchService;
+import com.wuyou.rag.rag.search.EsSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
