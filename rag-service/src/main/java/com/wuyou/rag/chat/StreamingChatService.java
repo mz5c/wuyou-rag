@@ -5,20 +5,15 @@ import com.wuyou.rag.audit.AuditLogService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wuyou.rag.config.SensitiveWordFilter;
 import com.wuyou.rag.entity.kb.KbChatHistory;
-import com.wuyou.rag.entity.kb.KbChunk;
 import com.wuyou.rag.entity.kb.KbConfig;
 import com.wuyou.rag.entity.kb.KbConversation;
-import com.wuyou.rag.entity.kb.KbDocument;
 import com.wuyou.rag.mapper.KbChatHistoryMapper;
-import com.wuyou.rag.mapper.KbChunkMapper;
 import com.wuyou.rag.mapper.KbConfigMapper;
 import com.wuyou.rag.mapper.KbConversationMapper;
-import com.wuyou.rag.mapper.KbDocumentMapper;
-import com.wuyou.rag.rag.embedding.BgeEmbeddingService;
 import com.wuyou.rag.rag.llm.LlmService;
 import com.wuyou.rag.rag.llm.QwenLlmService;
 import com.wuyou.rag.rag.prompt.PromptBuilder;
-import com.wuyou.rag.rag.vector.MilvusVectorService;
+import com.wuyou.rag.rag.search.HybridSearchService;
 import com.wuyou.rag.exception.BizException;
 import com.wuyou.rag.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,17 +46,14 @@ public class StreamingChatService {
     private static final long SSE_TIMEOUT_MS = 300_000L;
     private static final String CACHE_KEY_PREFIX = "rag:qa:cache:";
     private static final long CACHE_TTL_SECONDS = 3600;
-    private static final int DEFAULT_TOP_K = 5;
+
     private static final String FALLBACK_ANSWER = "抱歉，AI 服务暂时不可用，请稍后再试。";
     private static final long TOKEN_DELAY_MS = 30;
 
-    private final BgeEmbeddingService embeddingService;
-    private final MilvusVectorService vectorService;
+    private final HybridSearchService hybridSearchService;
     private final PromptBuilder promptBuilder;
     private final QwenLlmService llmService;
     private final KbConfigMapper kbConfigMapper;
-    private final KbChunkMapper kbChunkMapper;
-    private final KbDocumentMapper kbDocumentMapper;
     private final KbChatHistoryMapper chatHistoryMapper;
     private final KbConversationMapper conversationMapper;
     private final SensitiveWordFilter sensitiveWordFilter;
@@ -88,36 +80,20 @@ public class StreamingChatService {
 
         streamingExecutor.execute(() -> {
             try {
-                // 3. Embedding
-                log.debug("Generating embedding for streaming question");
-                float[] queryVector = embeddingService.embed(question);
-
-                // 4. Milvus search
-                int topK = getTopK();
-                log.debug("Searching Milvus with topK={}", topK);
-                List<Long> chunkIds = vectorService.search(queryVector, topK);
-
-                // 5. Get chunk content and document info
-                List<ChatService.SourceDoc> sources = new ArrayList<>();
-                List<String> contextChunks = new ArrayList<>();
-                for (Long chunkId : chunkIds) {
-                    KbChunk chunk = kbChunkMapper.selectById(chunkId);
-                    if (chunk == null) {
-                        continue;
-                    }
-                    contextChunks.add(chunk.getChunkContent());
-
-                    String docTitle = null;
-                    String docUrl = null;
-                    if (chunk.getDocId() != null) {
-                        KbDocument doc = kbDocumentMapper.selectById(chunk.getDocId());
-                        if (doc != null) {
-                            docTitle = doc.getTitle();
-                            docUrl = doc.getFileUrl();
-                        }
-                    }
-                    sources.add(new ChatService.SourceDoc(chunkId, chunk.getChunkContent(), docTitle, docUrl));
+                // 3-5. Hybrid search (Milvus + ES BM25 + RRF)
+                Long kbId = null;
+                if (resolvedConversationId != null) {
+                    KbConversation conv = conversationMapper.selectById(resolvedConversationId);
+                    if (conv != null) kbId = conv.getKbId();
                 }
+                log.debug("Hybrid searching for streaming, kbId={}", kbId);
+                List<HybridSearchService.SearchResult> searchResults = hybridSearchService.search(question, kbId);
+
+                List<Long> chunkIds = searchResults.stream().map(HybridSearchService.SearchResult::chunkId).collect(Collectors.toList());
+                List<String> contextChunks = searchResults.stream().map(HybridSearchService.SearchResult::content).collect(Collectors.toList());
+                List<ChatService.SourceDoc> sources = searchResults.stream()
+                        .map(r -> new ChatService.SourceDoc(r.chunkId(), r.content(), r.docTitle(), r.docUrl()))
+                        .collect(Collectors.toList());
 
                 // 6. Send sources event FIRST, so frontend can render citations
                 String sourcesJson = objectMapper.writeValueAsString(sources);
@@ -265,19 +241,6 @@ public class StreamingChatService {
             emitter.completeWithError(e);
         }
         return emitter;
-    }
-
-    private int getTopK() {
-        KbConfig config = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "search.top_k"));
-        if (config != null && config.getConfigValue() != null) {
-            try {
-                return Integer.parseInt(config.getConfigValue());
-            } catch (NumberFormatException e) {
-                log.warn("Invalid search.top_k config: {}", config.getConfigValue());
-            }
-        }
-        return DEFAULT_TOP_K;
     }
 
     private long getCacheTtl() {
