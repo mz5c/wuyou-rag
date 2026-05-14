@@ -13,6 +13,7 @@ import com.wuyou.rag.mapper.KbChunkMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.rag.embedding.EmbeddingService;
 import com.wuyou.rag.rag.vector.VectorService;
+import com.wuyou.rag.search.EsSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -33,6 +34,7 @@ public class DocumentProcessConsumer {
     private final TextChunker textChunker;
     private final EmbeddingService embeddingService;
     private final VectorService vectorService;
+    private final EsSearchService esSearchService;
 
     @RabbitListener(queues = RabbitConfig.DOCUMENT_PROCESS_QUEUE)
     public void handleDocumentProcess(Long docId) {
@@ -95,6 +97,17 @@ public class DocumentProcessConsumer {
             // Batch insert vectors to Milvus
             vectorService.insertVectors(chunkIds, vectors);
             log.info("Vectors inserted to Milvus: docId={}, vectorCount={}", docId, chunkIds.size());
+
+            // Index chunks to ES
+            try {
+                for (int i = 0; i < chunkEntities.size(); i++) {
+                    KbChunk chunk = chunkEntities.get(i);
+                    esSearchService.indexChunk(chunk.getId(), docId, chunk.getChunkContent(), document.getKbId());
+                }
+                log.info("Chunks indexed to ES: docId={}", docId);
+            } catch (Exception e) {
+                log.warn("Failed to index chunks to ES, docId={}", docId, e);
+            }
 
             // Update chunk vectorId with chunk ID as reference
             for (KbChunk chunk : chunkEntities) {

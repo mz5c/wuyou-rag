@@ -16,6 +16,7 @@ import com.wuyou.rag.mapper.KbKnowledgeBaseMapper;
 import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.rag.vector.VectorService;
 import com.wuyou.rag.result.Result;
+import com.wuyou.rag.search.EsSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -44,6 +45,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final SysUserMapper sysUserMapper;
     private final FileStorageService fileStorageService;
     private final VectorService vectorService;
+    private final EsSearchService esSearchService;
     private final RabbitTemplate rabbitTemplate;
 
     @Override
@@ -174,6 +176,13 @@ public class DocumentServiceImpl implements DocumentService {
             log.warn("Failed to delete vectors from Milvus: docId={}", id, e);
         }
 
+        // Delete from ES
+        try {
+            esSearchService.deleteByDocId(id);
+        } catch (Exception e) {
+            log.warn("Failed to delete from ES: docId={}", id, e);
+        }
+
         // Delete chunks from DB
         kbChunkMapper.delete(
                 Wrappers.<KbChunk>lambdaQuery().eq(KbChunk::getDocId, id));
@@ -214,6 +223,13 @@ public class DocumentServiceImpl implements DocumentService {
             vectorService.deleteByDocId(id);
         } catch (Exception e) {
             log.warn("Failed to delete vectors from Milvus: docId={}", id, e);
+        }
+
+        // Delete from ES
+        try {
+            esSearchService.deleteByDocId(id);
+        } catch (Exception e) {
+            log.warn("Failed to delete from ES during reprocess: docId={}", id, e);
         }
 
         // Reset document status
