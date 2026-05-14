@@ -138,6 +138,16 @@ INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
 ('cache.ttl_hot_qa', '3600', '热点问答缓存秒数'),
 ('sensitive_words', '', '敏感词列表（逗号分隔）');
 
+-- ES 配置
+INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
+('es.host', 'localhost', 'ES 主机地址'),
+('es.port', '9200', 'ES HTTP 端口'),
+('search.hybrid.enabled', 'true', '是否启用混合检索'),
+('search.hybrid.milvus_top_k', '20', 'Milvus 初筛返回数量'),
+('search.hybrid.es_top_k', '20', 'ES BM25 初筛返回数量'),
+('search.hybrid.final_top_k', '5', 'RRF 融合后最终 topN'),
+('search.hybrid.rrf_k', '60', 'RRF 公式常数 k');
+
 -- =====================================================
 -- 迁移脚本（对已有数据库增量添加字段，新库已含在 CREATE TABLE 中）
 -- 重复执行会报字段已存在的错，但 spring.sql.init.continue-on-error=true 会忽略
