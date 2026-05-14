@@ -120,7 +120,7 @@ services:
       retries: 3
 
   elasticsearch:
-    build: ./docker/elasticsearch
+    image: medcl/elasticsearch:8.11.2
     container_name: wy-rag-es
     hostname: es_host
     restart: always
