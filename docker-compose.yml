@@ -119,6 +119,26 @@ services:
       timeout: 10s
       retries: 3
 
+  elasticsearch:
+    build: ./docker/elasticsearch
+    container_name: wy-rag-es
+    hostname: es_host
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - ingest.geoip.downloader.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   attu:
     image: zilliz/attu:v2.4
     container_name: wy-rag-attu
@@ -137,3 +157,4 @@ volumes:
   minio_data:
   etcd_data:
   milvus_data:
+  es_data:
