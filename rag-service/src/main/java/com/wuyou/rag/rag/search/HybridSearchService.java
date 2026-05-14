@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,9 +55,14 @@ public class HybridSearchService {
             // 1. Generate embedding
             float[] queryVector = embeddingService.embed(question);
 
-            // 2. Parallel search
-            List<Long> milvusChunkIds = vectorService.search(queryVector, milvusTopK);
-            List<EsSearchService.EsSearchHit> esHits = esSearchService.search(question, kbId, esTopK);
+            // 2. Parallel search (Milvus + ES concurrently)
+            CompletableFuture<List<Long>> milvusFuture = CompletableFuture.supplyAsync(
+                    () -> vectorService.search(queryVector, milvusTopK));
+            CompletableFuture<List<EsSearchService.EsSearchHit>> esFuture = CompletableFuture.supplyAsync(
+                    () -> esSearchService.search(question, kbId, esTopK));
+
+            List<Long> milvusChunkIds = milvusFuture.get();
+            List<EsSearchService.EsSearchHit> esHits = esFuture.get();
 
             // 3. RRF fusion
             return rrfFuse(milvusChunkIds, esHits, rrfK, finalTopK);

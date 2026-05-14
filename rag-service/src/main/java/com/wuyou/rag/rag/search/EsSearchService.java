@@ -53,6 +53,9 @@ public class EsSearchService {
     private final ObjectMapper objectMapper;
 
     private String esUrl;
+    private volatile boolean esAvailable = true;
+    private volatile long lastAvailabilityCheck = 0;
+    private static final long AVAILABILITY_CHECK_INTERVAL_MS = 30_000;
 
     @PostConstruct
     public void init() {
@@ -117,12 +120,14 @@ public class EsSearchService {
             matchNode.set("match", matchContent);
             mustArray.add(matchNode);
 
-            ArrayNode filterArray = boolNode.putArray("filter");
-            ObjectNode termNode = objectMapper.createObjectNode();
-            ObjectNode termKbId = objectMapper.createObjectNode();
-            termKbId.put("kb_id", kbId);
-            termNode.set("term", termKbId);
-            filterArray.add(termNode);
+            if (kbId != null) {
+                ArrayNode filterArray = boolNode.putArray("filter");
+                ObjectNode termNode = objectMapper.createObjectNode();
+                ObjectNode termKbId = objectMapper.createObjectNode();
+                termKbId.put("kb_id", kbId);
+                termNode.set("term", termKbId);
+                filterArray.add(termNode);
+            }
 
             queryBody.set("query", objectMapper.createObjectNode().set("bool", boolNode));
             queryBody.put("size", topK);
@@ -191,14 +196,20 @@ public class EsSearchService {
         }
     }
 
-    /** Check if ES is available */
+    /** Check if ES is available (cached, refreshes every 30s) */
     public boolean isAvailable() {
+        long now = System.currentTimeMillis();
+        if (now - lastAvailabilityCheck < AVAILABILITY_CHECK_INTERVAL_MS) {
+            return esAvailable;
+        }
+        lastAvailabilityCheck = now;
         try {
             restTemplate.getForEntity(esUrl + "/_cluster/health", String.class);
-            return true;
+            esAvailable = true;
         } catch (Exception e) {
-            return false;
+            esAvailable = false;
         }
+        return esAvailable;
     }
 
     public record EsSearchHit(Long chunkId, Long docId, String content, double score) {}
