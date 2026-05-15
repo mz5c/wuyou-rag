@@ -138,10 +138,8 @@ INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
 ('cache.ttl_hot_qa', '3600', '热点问答缓存秒数'),
 ('sensitive_words', '', '敏感词列表（逗号分隔）');
 
--- ES 配置
+
 INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
-('es.host', 'localhost', 'ES 主机地址'),
-('es.port', '9200', 'ES HTTP 端口'),
 ('search.hybrid.enabled', 'true', '是否启用混合检索'),
 ('search.hybrid.milvus_top_k', '20', 'Milvus 初筛返回数量'),
 ('search.hybrid.es_top_k', '20', 'ES BM25 初筛返回数量'),

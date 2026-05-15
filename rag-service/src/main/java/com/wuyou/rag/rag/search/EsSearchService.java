@@ -1,15 +1,14 @@
 package com.wuyou.rag.rag.search;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.wuyou.rag.entity.kb.KbConfig;
-import com.wuyou.rag.mapper.KbConfigMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -48,37 +47,43 @@ public class EsSearchService {
             }
             """;
 
-    private final RestTemplate restTemplate;
-    private final KbConfigMapper kbConfigMapper;
+    private final RestTemplateBuilder restTemplateBuilder;
     private final ObjectMapper objectMapper;
 
-    private String esUrl;
+    @Value("${es.username}")
+    private String username;
+
+    @Value("${es.password}")
+    private String password;
+
+    @Value("${es.endpoint}")
+    private String endpoint;
+
+    private RestTemplate esRestTemplate;
     private volatile boolean esAvailable = true;
     private volatile long lastAvailabilityCheck = 0;
     private static final long AVAILABILITY_CHECK_INTERVAL_MS = 30_000;
 
     @PostConstruct
     public void init() {
-        KbConfig hostConfig = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "es.host"));
-        KbConfig portConfig = kbConfigMapper.selectOne(
-                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, "es.port"));
-
-        String host = hostConfig != null ? hostConfig.getConfigValue() : "localhost";
-        int port = portConfig != null ? Integer.parseInt(portConfig.getConfigValue()) : 9200;
-        esUrl = "http://" + host + ":" + port;
-
+        if (!username.isEmpty()) {
+            esRestTemplate = restTemplateBuilder
+                    .basicAuthentication(username, password)
+                    .build();
+        } else {
+            esRestTemplate = new RestTemplate();
+        }
         createIndexIfNotExists();
     }
 
     private void createIndexIfNotExists() {
         try {
-            String url = esUrl + "/" + INDEX_NAME;
-            restTemplate.execute(url, org.springframework.http.HttpMethod.HEAD, null, null);
+            String url = endpoint + "/" + INDEX_NAME;
+            esRestTemplate.execute(url, org.springframework.http.HttpMethod.HEAD, null, null);
             log.info("ES index already exists: {}", INDEX_NAME);
         } catch (Exception e) {
             try {
-                restTemplate.put(esUrl + "/" + INDEX_NAME, SETTINGS, String.class);
+                esRestTemplate.put(endpoint + "/" + INDEX_NAME, SETTINGS, String.class);
                 log.info("ES index created: {}", INDEX_NAME);
             } catch (Exception ex) {
                 log.warn("Failed to create ES index, ES may be unavailable: {}", ex.getMessage());
@@ -97,8 +102,8 @@ public class EsSearchService {
             doc.put("create_time", java.time.LocalDateTime.now().format(
                     java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
-            restTemplate.postForEntity(
-                    esUrl + "/" + INDEX_NAME + "/_doc/" + chunkId,
+            esRestTemplate.postForEntity(
+                    endpoint + "/" + INDEX_NAME + "/_doc/" + chunkId,
                     doc,
                     String.class);
         } catch (Exception e) {
@@ -140,8 +145,8 @@ public class EsSearchService {
             includes.add("doc_id");
             queryBody.set("_source", sourceNode);
 
-            String url = esUrl + "/" + INDEX_NAME + "/_search";
-            String response = restTemplate.postForEntity(url, queryBody, String.class).getBody();
+            String url = endpoint + "/" + INDEX_NAME + "/_search";
+            String response = esRestTemplate.postForEntity(url, queryBody, String.class).getBody();
             return parseSearchResponse(response, topK);
         } catch (Exception e) {
             log.warn("ES search failed, query={}", query, e);
@@ -177,8 +182,8 @@ public class EsSearchService {
             term.set("term", termValue);
             body.set("query", objectMapper.createObjectNode().set("term", term));
 
-            restTemplate.postForEntity(
-                    esUrl + "/" + INDEX_NAME + "/_delete_by_query",
+            esRestTemplate.postForEntity(
+                    endpoint + "/" + INDEX_NAME + "/_delete_by_query",
                     body,
                     String.class);
             log.info("Deleted ES docs by docId={}", docId);
@@ -190,7 +195,7 @@ public class EsSearchService {
     /** Delete a single chunk */
     public void deleteChunk(Long chunkId) {
         try {
-            restTemplate.delete(esUrl + "/" + INDEX_NAME + "/_doc/" + chunkId);
+            esRestTemplate.delete(endpoint + "/" + INDEX_NAME + "/_doc/" + chunkId);
         } catch (Exception e) {
             log.warn("Failed to delete ES chunk: chunkId={}", chunkId, e);
         }
@@ -204,7 +209,7 @@ public class EsSearchService {
         }
         lastAvailabilityCheck = now;
         try {
-            restTemplate.getForEntity(esUrl + "/_cluster/health", String.class);
+            esRestTemplate.getForEntity(endpoint + "/_cluster/health", String.class);
             esAvailable = true;
         } catch (Exception e) {
             esAvailable = false;
