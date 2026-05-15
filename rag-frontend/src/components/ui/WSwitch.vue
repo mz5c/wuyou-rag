@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-defineProps({ modelValue: Boolean, disabled: Boolean })
+const { modelValue } = defineProps({ modelValue: Boolean, disabled: Boolean })
 const emit = defineEmits(['update:modelValue'])
 function toggle() { emit('update:modelValue', !modelValue) }
 </script>

@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -83,7 +87,10 @@ public class EsSearchService {
             log.info("ES index already exists: {}", INDEX_NAME);
         } catch (Exception e) {
             try {
-                esRestTemplate.put(endpoint + "/" + INDEX_NAME, SETTINGS, String.class);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                HttpEntity<String> entity = new HttpEntity<>(SETTINGS, headers);
+                esRestTemplate.exchange(endpoint + "/" + INDEX_NAME, HttpMethod.PUT, entity, String.class);
                 log.info("ES index created: {}", INDEX_NAME);
             } catch (Exception ex) {
                 log.warn("Failed to create ES index, ES may be unavailable: {}", ex.getMessage());

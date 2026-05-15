@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="w-dialog-fade">
-      <div v-if="visible" class="w-dialog-overlay" @click.self="close">
+      <div v-if="modelValue" class="w-dialog-overlay" @click.self="close">
         <Transition name="w-dialog-zoom" appear>
           <div class="w-dialog" :style="{ maxWidth: width }">
             <div class="w-dialog__header">
@@ -25,12 +25,12 @@
 
 <script setup>
 defineProps({
-  visible: Boolean,
+  modelValue: Boolean,
   title: { type: String, default: '' },
   width: { type: String, default: '480px' }
 })
-const emit = defineEmits(['update:visible'])
-function close() { emit('update:visible', false) }
+const emit = defineEmits(['update:modelValue'])
+function close() { emit('update:modelValue', false) }
 </script>
 
 <style scoped>

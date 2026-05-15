@@ -43,7 +43,7 @@
         </div>
         <div class="toolbar-right">
           <WButton variant="primary" @click="showUploadDialog">
-            <WIcon name="upload" size="14" /> 上传文档
+            <WIcon name="plus" size="14" /> 上传文档
           </WButton>
         </div>
       </div>
