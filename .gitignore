@@ -81,3 +81,5 @@ npm-debug.log*
 
 # Frontend build output
 rag-frontend/dist/
+
+bug.txt

@@ -18,7 +18,7 @@ TUNNELS=(
 for entry in "${TUNNELS[@]}"; do
   port="${entry%%:*}"
   desc="${entry#*:}"
-  if lsof -i :"$port" > /dev/null 2>&1; then
+  if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
     echo "已连接  $port  $desc"
   else
     ssh -fNL "$port:127.0.0.1:$port" wydev && echo "已建立  $port  $desc"
