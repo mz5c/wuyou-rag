@@ -13,6 +13,7 @@ import com.wuyou.rag.mapper.KbConversationMapper;
 import com.wuyou.rag.rag.llm.LlmService;
 import com.wuyou.rag.rag.llm.QwenLlmService;
 import com.wuyou.rag.rag.prompt.PromptBuilder;
+import com.wuyou.rag.rag.query.QueryRewriter;
 import com.wuyou.rag.rag.search.HybridSearchService;
 import com.wuyou.rag.exception.BizException;
 import com.wuyou.rag.exception.ErrorCode;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -48,11 +50,11 @@ public class StreamingChatService {
     private static final long CACHE_TTL_SECONDS = 3600;
 
     private static final String FALLBACK_ANSWER = "抱歉，AI 服务暂时不可用，请稍后再试。";
-    private static final long TOKEN_DELAY_MS = 30;
 
     private final HybridSearchService hybridSearchService;
     private final PromptBuilder promptBuilder;
     private final QwenLlmService llmService;
+    private final QueryRewriter queryRewriter;
     private final KbConfigMapper kbConfigMapper;
     private final KbChatHistoryMapper chatHistoryMapper;
     private final KbConversationMapper conversationMapper;
@@ -62,7 +64,7 @@ public class StreamingChatService {
     private final ObjectMapper objectMapper;
     private final HttpServletRequest httpServletRequest;
 
-    private final ExecutorService streamingExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService streamingExecutor = Executors.newFixedThreadPool(20);
 
     public SseEmitter streamChat(Long userId, Long conversationId, String question) {
         long startTime = System.currentTimeMillis();
@@ -80,28 +82,13 @@ public class StreamingChatService {
 
         streamingExecutor.execute(() -> {
             try {
-                // 3-5. Hybrid search (Milvus + ES BM25 + RRF)
                 Long kbId = null;
                 if (resolvedConversationId != null) {
                     KbConversation conv = conversationMapper.selectById(resolvedConversationId);
                     if (conv != null) kbId = conv.getKbId();
                 }
-                log.debug("Hybrid searching for streaming, kbId={}", kbId);
-                List<HybridSearchService.SearchResult> searchResults = hybridSearchService.search(question, kbId);
 
-                List<Long> chunkIds = searchResults.stream().map(HybridSearchService.SearchResult::chunkId).collect(Collectors.toList());
-                List<String> contextChunks = searchResults.stream().map(HybridSearchService.SearchResult::content).collect(Collectors.toList());
-                List<ChatService.SourceDoc> sources = searchResults.stream()
-                        .map(r -> new ChatService.SourceDoc(r.chunkId(), r.content(), r.docTitle(), r.docUrl()))
-                        .collect(Collectors.toList());
-
-                // 6. Send sources event FIRST, so frontend can render citations
-                String sourcesJson = objectMapper.writeValueAsString(sources);
-                emitter.send(SseEmitter.event()
-                        .name("sources")
-                        .data(sourcesJson));
-
-                // 7. Get conversation history (last N rounds)
+                // 3. Get conversation history
                 List<KbChatHistory> chatHistory = chatHistoryMapper.selectList(
                         Wrappers.<KbChatHistory>lambdaQuery()
                                 .eq(KbChatHistory::getConversationId, resolvedConversationId)
@@ -109,82 +96,148 @@ public class StreamingChatService {
                                 .last("LIMIT 20"));
                 Collections.reverse(chatHistory);
 
-                // 8. Build messages with history
+                // 4. Query rewriting
+                String searchQuestion = question;
+                if (!chatHistory.isEmpty()) {
+                    searchQuestion = queryRewriter.rewrite(question, chatHistory);
+                }
+
+                // 5. Hybrid search (Milvus + ES BM25 + RRF + Reranker)
+                log.debug("Hybrid searching for streaming, kbId={}, rewritten={}",
+                        kbId, !searchQuestion.equals(question));
+                List<HybridSearchService.SearchResult> searchResults =
+                        hybridSearchService.search(searchQuestion, kbId);
+
+                List<Long> chunkIds = searchResults.stream()
+                        .map(HybridSearchService.SearchResult::chunkId).collect(Collectors.toList());
+                List<String> contextChunks = searchResults.stream()
+                        .map(HybridSearchService.SearchResult::content).collect(Collectors.toList());
+                List<ChatService.SourceDoc> sources = searchResults.stream()
+                        .map(r -> new ChatService.SourceDoc(r.chunkId(), r.content(), r.docTitle(), r.docUrl()))
+                        .collect(Collectors.toList());
+
+                // 6. Send sources event FIRST
+                String sourcesJson = objectMapper.writeValueAsString(sources);
+                emitter.send(SseEmitter.event()
+                        .name("sources")
+                        .data(sourcesJson));
+
+                // 7. Build messages with history
                 List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
-                // 9. LLM call (non-streaming for now, simulate token streaming)
-                LlmService.ChatResult result = llmService.chat(messages);
-                String fullAnswer = result.answer();
-                String reasoningContent = result.reasoningContent();
+                // 8. Real SSE streaming LLM call
+                StringBuilder reasoningContent = new StringBuilder();
+                final boolean[] reasoningStarted = {false};
+                final AtomicBoolean sseFailed = new AtomicBoolean(false);
 
-                // 10. Send reasoning content event
-                if (reasoningContent != null) {
-                    JSONObject reasoningEvent = new JSONObject();
-                    reasoningEvent.put("content", reasoningContent);
-                    emitter.send(SseEmitter.event()
-                            .name("reasoning")
-                            .data(reasoningEvent.toJSONString()));
-                }
+                llmService.streamChat(messages,
+                    // onToken — called for each token from LLM
+                    token -> {
 
-                // 11. Stream answer token by token
-                for (char c : fullAnswer.toCharArray()) {
-                    emitter.send(SseEmitter.event()
-                            .name("token")
-                            .data(String.valueOf(c)));
-                    Thread.sleep(TOKEN_DELAY_MS);
-                }
+                        // Detect reasoning content (content wrapped in think/reasoning tags)
+                        if (token.contains("</reasoning>") || token.contains("</think>")) {
+                            reasoningStarted[0] = false;
+                            return;
+                        }
+                        if (reasoningStarted[0]) {
+                            reasoningContent.append(token);
+                            return;
+                        }
+                        if (token.contains("<reasoning>") || token.contains("<think>")) {
+                            reasoningStarted[0] = true;
+                            return;
+                        }
 
-                // 12. Send done event with elapsed time
-                long elapsed = System.currentTimeMillis() - startTime;
-                emitter.send(SseEmitter.event()
-                        .name("done")
-                        .data("{\"elapsedMs\": " + elapsed + "}"));
+                        // Skip if SSE connection lost
+                        if (sseFailed.get()) {
+                            return;
+                        }
 
-                // 13. Save chat history
-                String usedChunkIds = chunkIds.stream()
-                        .map(String::valueOf)
-                        .collect(Collectors.joining(","));
+                        // Send token to frontend
+                        try {
+                            emitter.send(SseEmitter.event()
+                                    .name("token")
+                                    .data(token));
+                        } catch (IOException e) {
+                            sseFailed.set(true);
+                            log.warn("SSE connection lost, stopping stream");
+                        }
+                    },
+                    // onComplete — called when LLM finishes
+                    result -> {
+                        try {
+                            String finalAnswer = result.answer();
+                            long elapsed = System.currentTimeMillis() - startTime;
 
-                KbChatHistory history = new KbChatHistory();
-                history.setConversationId(resolvedConversationId);
-                history.setUserId(userId);
-                history.setQuestion(sensitiveWordFilter.filter(question));
-                history.setAnswer(fullAnswer);
-                history.setAnswerType("llm");
-                history.setReasoningContent(reasoningContent);
-                history.setUsedChunkIds(usedChunkIds);
-                history.setSources(sourcesJson);
-                history.setElapsedMs((int) elapsed);
-                history.setCreateTime(LocalDateTime.now());
-                chatHistoryMapper.insert(history);
+                            // Send done event
+                            emitter.send(SseEmitter.event()
+                                    .name("done")
+                                    .data("{\"elapsedMs\": " + elapsed + "}"));
 
-                // Update conversation message count
-                KbConversation conv = conversationMapper.selectById(resolvedConversationId);
-                if (conv != null) {
-                    conv.setMessageCount(conv.getMessageCount() + 1);
-                    conv.setUpdateTime(LocalDateTime.now());
-                    conversationMapper.updateById(conv);
-                }
+                            // Save chat history
+                            String usedChunkIds = chunkIds.stream()
+                                    .map(String::valueOf)
+                                    .collect(Collectors.joining(","));
 
-                // 14. Cache hot QA (skip fallback error messages)
-                if (!fullAnswer.contains(FALLBACK_ANSWER)) {
-                    long cacheTtl = getCacheTtl();
-                    String cacheKey = CACHE_KEY_PREFIX + md5Hex(question);
-                    redisTemplate.opsForValue().set(cacheKey, fullAnswer, cacheTtl, TimeUnit.SECONDS);
-                    log.debug("Cached streaming QA response: key={}, ttl={}s", cacheKey, cacheTtl);
-                }
+                            KbChatHistory history = new KbChatHistory();
+                            history.setConversationId(resolvedConversationId);
+                            history.setUserId(userId);
+                            history.setQuestion(sensitiveWordFilter.filter(question));
+                            history.setAnswer(finalAnswer);
+                            history.setAnswerType("llm");
+                            history.setReasoningContent(result.reasoningContent());
+                            history.setUsedChunkIds(usedChunkIds);
+                            history.setSources(sourcesJson);
+                            history.setElapsedMs((int) elapsed);
+                            history.setCreateTime(LocalDateTime.now());
+                            chatHistoryMapper.insert(history);
 
-                // 15. Audit log
-                String ip = normalizeIp(httpServletRequest.getRemoteAddr());
-                String userAgent = httpServletRequest.getHeader("User-Agent");
-                String detail = "对话ID: " + resolvedConversationId + ", 问题长度: " + question.length();
-                auditLogService.log(userId, "user", "CHAT", detail, ip, userAgent);
+                            // Update conversation message count
+                            KbConversation conv = conversationMapper.selectById(resolvedConversationId);
+                            if (conv != null) {
+                                conv.setMessageCount(conv.getMessageCount() + 1);
+                                conv.setUpdateTime(LocalDateTime.now());
+                                conversationMapper.updateById(conv);
+                            }
 
-                emitter.complete();
-                log.info("Streaming chat completed: conversationId={}", resolvedConversationId);
+                            // Cache hot QA
+                            if (!finalAnswer.contains(FALLBACK_ANSWER)) {
+                                long cacheTtl = getCacheTtl();
+                                String cacheKey = CACHE_KEY_PREFIX + md5Hex(question);
+                                redisTemplate.opsForValue().set(cacheKey, finalAnswer, cacheTtl, TimeUnit.SECONDS);
+                            }
+
+                            // Audit log
+                            String ip = normalizeIp(httpServletRequest.getRemoteAddr());
+                            String userAgent = httpServletRequest.getHeader("User-Agent");
+                            String detail = "对话ID: " + resolvedConversationId + ", 问题长度: " + question.length();
+                            auditLogService.log(userId, "user", "CHAT", detail, ip, userAgent);
+
+                            emitter.complete();
+                            log.info("Streaming chat completed: conversationId={}", resolvedConversationId);
+
+                        } catch (IOException e) {
+                            log.error("Failed to complete streaming chat", e);
+                            emitter.completeWithError(e);
+                        }
+                    },
+                    // onError
+                    error -> {
+                        log.error("Streaming chat failed: userId={}, conversationId={}",
+                                userId, resolvedConversationId, error);
+                        try {
+                            emitter.send(SseEmitter.event()
+                                    .name("error")
+                                    .data("抱歉，处理出错，请稍后再试"));
+                        } catch (IOException ex) {
+                            log.warn("Failed to send error event", ex);
+                        }
+                        emitter.completeWithError(error);
+                    });
 
             } catch (Exception e) {
-                log.error("Streaming chat failed: userId={}, conversationId={}", userId, resolvedConversationId, e);
+                log.error("Streaming chat failed: userId={}, conversationId={}",
+                        userId, resolvedConversationId, e);
                 try {
                     emitter.send(SseEmitter.event()
                             .name("error")
@@ -199,10 +252,6 @@ public class StreamingChatService {
         return emitter;
     }
 
-    /**
-     * Resolve conversation: auto-create if conversationId is null,
-     * verify ownership if provided.
-     */
     private Long resolveConversation(Long userId, Long conversationId, String question) {
         if (conversationId == null) {
             String title = question.length() > 30 ? question.substring(0, 30) + "..." : question;
@@ -227,9 +276,6 @@ public class StreamingChatService {
         return conversationId;
     }
 
-    /**
-     * Create an SseEmitter that immediately sends an error event and completes.
-     */
     private SseEmitter sendErrorEvent(String message) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         try {

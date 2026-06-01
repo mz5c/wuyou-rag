@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyou.rag.audit.AuditLogService;
+import com.wuyou.rag.cache.SemanticCacheService;
 import com.wuyou.rag.chat.ChatService;
 import com.wuyou.rag.config.SensitiveWordFilter;
 import com.wuyou.rag.entity.kb.KbChatHistory;
@@ -21,6 +22,7 @@ import com.wuyou.rag.mapper.SysUserMapper;
 import com.wuyou.rag.rag.llm.LlmService;
 import com.wuyou.rag.rag.llm.QwenLlmService;
 import com.wuyou.rag.rag.prompt.PromptBuilder;
+import com.wuyou.rag.rag.query.QueryRewriter;
 import com.wuyou.rag.rag.search.HybridSearchService;
 import com.wuyou.rag.result.Result;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +58,9 @@ public class ChatServiceImpl implements ChatService {
     private final HybridSearchService hybridSearchService;
     private final QwenLlmService llmService;
     private final PromptBuilder promptBuilder;
+    private final QueryRewriter queryRewriter;
     private final AuditLogService auditLogService;
+    private final SemanticCacheService semanticCacheService;
     private final SensitiveWordFilter sensitiveWordFilter;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -132,7 +136,7 @@ public class ChatServiceImpl implements ChatService {
             return Result.fail(ErrorCode.SENSITIVE_WORD.getCode(), ErrorCode.SENSITIVE_WORD.getMessage());
         }
 
-        // 2. Redis cache check
+        // 2. Redis exact-match cache check
         String cacheKey = CACHE_KEY_PREFIX + md5Hex(question);
         String cachedAnswer = redisTemplate.opsForValue().get(cacheKey);
         if (cachedAnswer != null) {
@@ -141,6 +145,18 @@ public class ChatServiceImpl implements ChatService {
             ChatResponse cachedResponse = new ChatResponse(conversationId, null,
                     cachedAnswer, null, new ArrayList<>(), (int) elapsed);
             return Result.success(cachedResponse);
+        }
+
+        // 2b. Semantic cache check
+        if (semanticCacheService.isEnabled()) {
+            String semanticCached = semanticCacheService.lookup(question);
+            if (semanticCached != null) {
+                log.info("Semantic cache hit for question: {}", md5Hex(question));
+                long elapsed = System.currentTimeMillis() - startTime;
+                ChatResponse cachedResponse = new ChatResponse(conversationId, null,
+                        semanticCached, null, new ArrayList<>(), (int) elapsed);
+                return Result.success(cachedResponse);
+            }
         }
 
         // Auto-create conversation if conversationId is null
@@ -164,22 +180,13 @@ public class ChatServiceImpl implements ChatService {
         }
 
         try {
-            // 3-5. Hybrid search (Milvus + ES BM25 + RRF)
             Long kbId = null;
             if (conversationId != null) {
                 KbConversation conv = conversationMapper.selectById(conversationId);
                 if (conv != null) kbId = conv.getKbId();
             }
-            log.debug("Hybrid searching, kbId={}", kbId);
-            List<HybridSearchService.SearchResult> searchResults = hybridSearchService.search(question, kbId);
 
-            List<Long> chunkIds = searchResults.stream().map(HybridSearchService.SearchResult::chunkId).collect(Collectors.toList());
-            List<String> contextChunks = searchResults.stream().map(HybridSearchService.SearchResult::content).collect(Collectors.toList());
-            List<SourceDoc> sources = searchResults.stream()
-                    .map(r -> new SourceDoc(r.chunkId(), r.content(), r.docTitle(), r.docUrl()))
-                    .collect(Collectors.toList());
-
-            // 6. Get conversation history (last N rounds)
+            // 3. Get conversation history (last N rounds)
             List<KbChatHistory> chatHistory = chatHistoryMapper.selectList(
                     Wrappers.<KbChatHistory>lambdaQuery()
                             .eq(KbChatHistory::getConversationId, conversationId)
@@ -187,7 +194,23 @@ public class ChatServiceImpl implements ChatService {
                             .last("LIMIT 20"));
             Collections.reverse(chatHistory);
 
-            // 7. Build messages with history
+            // 4. Query rewriting (conversation-aware)
+            String searchQuestion = question;
+            if (!chatHistory.isEmpty()) {
+                searchQuestion = queryRewriter.rewrite(question, chatHistory);
+            }
+
+            // 5. Hybrid search (Milvus + ES BM25 + RRF)
+            log.debug("Hybrid searching, kbId={}, rewritten={}", kbId, !searchQuestion.equals(question));
+            List<HybridSearchService.SearchResult> searchResults = hybridSearchService.search(searchQuestion, kbId);
+
+            List<Long> chunkIds = searchResults.stream().map(HybridSearchService.SearchResult::chunkId).collect(Collectors.toList());
+            List<String> contextChunks = searchResults.stream().map(HybridSearchService.SearchResult::content).collect(Collectors.toList());
+            List<SourceDoc> sources = searchResults.stream()
+                    .map(r -> new SourceDoc(r.chunkId(), r.content(), r.docTitle(), r.docUrl()))
+                    .collect(Collectors.toList());
+
+            // 6. Build messages with history
             List<LlmService.Message> messages = promptBuilder.buildMessages(question, contextChunks, chatHistory);
 
             // 8. LLM call
@@ -235,6 +258,7 @@ public class ChatServiceImpl implements ChatService {
             if (!answer.contains(FALLBACK_ANSWER)) {
                 long cacheTtl = getCacheTtl();
                 redisTemplate.opsForValue().set(cacheKey, answer, cacheTtl, TimeUnit.SECONDS);
+                semanticCacheService.store(question, answer);
                 log.debug("Cached QA response: key={}, ttl={}s", cacheKey, cacheTtl);
             }
 

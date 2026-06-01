@@ -131,6 +131,7 @@ INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
 ('embedding.dimensions', '1024', '向量维度'),
 ('chunk.max_size', '1024', '分块最大字符数'),
 ('chunk.overlap', '128', '分块重叠窗口字符数'),
+('chunk.segmenter', 'sentence', '分块切割策略：hard/sentence'),
 ('milvus.host', 'localhost', 'Milvus 主机地址'),
 ('milvus.port', '19530', 'Milvus 端口'),
 ('milvus.collection', 'document_chunks', 'Milvus 集合名称'),
@@ -144,7 +145,12 @@ INSERT IGNORE INTO kb_config (config_key, config_value, description) VALUES
 ('search.hybrid.milvus_top_k', '20', 'Milvus 初筛返回数量'),
 ('search.hybrid.es_top_k', '20', 'ES BM25 初筛返回数量'),
 ('search.hybrid.final_top_k', '5', 'RRF 融合后最终 topN'),
-('search.hybrid.rrf_k', '60', 'RRF 公式常数 k');
+('search.hybrid.rrf_k', '60', 'RRF 公式常数 k'),
+('query.rewrite.enabled', 'true', '是否启用多轮对话 Query 改写'),
+('search.rerank.enabled', 'false', '是否启用 Reranker 重排'),
+('search.rerank.api_url', 'http://localhost:5002/rerank', 'Reranker API 地址'),
+('cache.semantic.enabled', 'false', '是否启用语义缓存'),
+('cache.semantic.threshold', '0.92', '语义缓存相似度阈值');
 
 -- =====================================================
 -- 迁移脚本（对已有数据库增量添加字段，新库已含在 CREATE TABLE 中）

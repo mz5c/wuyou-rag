@@ -8,8 +8,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * {@link DocumentParser} implementation for Markdown files.
  * <p>
- * Simply decodes the raw bytes as UTF-8 text. Markdown structure is preserved
- * for downstream chunking; no AST-level processing is performed here.
+ * Decodes the raw bytes as UTF-8, strips HTML tags and image references,
+ * then normalizes whitespace.
  */
 @Slf4j
 @Component
@@ -19,7 +19,10 @@ public class MarkdownParser implements DocumentParser {
 
     @Override
     public String parse(byte[] data, String filename) {
-        return new String(data, StandardCharsets.UTF_8).strip();
+        String text = new String(data, StandardCharsets.UTF_8);
+        text = TextNormalizer.stripMarkdownImages(text);
+        text = TextNormalizer.stripHtmlTags(text);
+        return TextNormalizer.normalizeWhitespace(text);
     }
 
     @Override

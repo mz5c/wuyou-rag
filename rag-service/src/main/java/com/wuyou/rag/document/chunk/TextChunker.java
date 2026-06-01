@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Splits parsed document text into overlapping chunks for embedding and indexing.
@@ -17,6 +18,8 @@ import java.util.List;
  * <ul>
  *   <li>{@code chunk.max_size} -- maximum characters per chunk (default: 1024)</li>
  *   <li>{@code chunk.overlap}  -- overlapping character window between chunks (default: 128)</li>
+ *   <li>{@code chunk.segmenter} -- splitting strategy: {@code hard} (character boundary) or
+ *       {@code sentence} (prefer sentence boundaries, default)</li>
  * </ul>
  */
 @Slf4j
@@ -26,8 +29,12 @@ public class TextChunker {
 
     private static final String CONFIG_KEY_MAX_SIZE = "chunk.max_size";
     private static final String CONFIG_KEY_OVERLAP = "chunk.overlap";
+    private static final String CONFIG_KEY_SEGMENTER = "chunk.segmenter";
     private static final int DEFAULT_MAX_SIZE = 1024;
     private static final int DEFAULT_OVERLAP = 128;
+
+    private static final Pattern SENTENCE_BOUNDARY = Pattern.compile(
+            "[。！？：；.!?:;\\n]");
 
     private final KbConfigMapper kbConfigMapper;
 
@@ -37,8 +44,10 @@ public class TextChunker {
     public List<ChunkResult> chunk(String text) {
         int maxSize = getConfigValue(CONFIG_KEY_MAX_SIZE, DEFAULT_MAX_SIZE);
         int overlap = getConfigValue(CONFIG_KEY_OVERLAP, DEFAULT_OVERLAP);
+        String segmenter = getConfigString(CONFIG_KEY_SEGMENTER, "sentence");
 
-        log.debug("Chunking text (length={}) with maxSize={}, overlap={}", text.length(), maxSize, overlap);
+        log.debug("Chunking text (length={}) with maxSize={}, overlap={}, segmenter={}",
+                text.length(), maxSize, overlap, segmenter);
 
         // Normalise line separators
         String normalized = text.replace("\r\n", "\n");
@@ -59,8 +68,8 @@ public class TextChunker {
         String lastChunkOverlap = "";
         int chunkIndex = 0;
 
-        for (int i = 0; i < paragraphs.length; i++) {
-            String para = paragraphs[i].strip();
+        for (String para : paragraphs) {
+            para = para.strip();
             if (para.isEmpty()) {
                 continue;
             }
@@ -74,30 +83,21 @@ public class TextChunker {
                     currentChunk = new StringBuilder();
                 }
 
-                // Hard-split the oversized paragraph
-                int start = 0;
-                while (start < para.length()) {
-                    int end = Math.min(start + maxSize, para.length());
-                    String segment = para.substring(start, end);
-
-                    // Build chunk with overlap from previous segment
+                // Split the oversized paragraph
+                List<String> segments = splitOversized(para, maxSize, overlap, segmenter);
+                for (int i = 0; i < segments.size(); i++) {
+                    String segment = segments.get(i);
                     StringBuilder segmentBuilder = new StringBuilder();
                     if (!lastChunkOverlap.isEmpty()) {
                         segmentBuilder.append(lastChunkOverlap);
                     }
                     segmentBuilder.append(segment);
-                    ChunkResult cr = new ChunkResult(
+                    results.add(new ChunkResult(
                             segmentBuilder.toString(),
                             chunkIndex++,
-                            segmentBuilder.length());
-                    results.add(cr);
-
-                    lastChunkOverlap = extractOverlap(para.substring(
-                            Math.max(0, end - overlap), end), overlap);
-                    start = end;
+                            segmentBuilder.length()));
+                    lastChunkOverlap = extractOverlap(segment, overlap);
                 }
-                lastChunkOverlap = extractOverlap(para.substring(
-                        Math.max(0, para.length() - overlap)), overlap);
                 continue;
             }
 
@@ -131,14 +131,50 @@ public class TextChunker {
     }
 
     /**
+     * Split an oversized paragraph into segments, respecting sentence boundaries
+     * when configured.
+     */
+    private List<String> splitOversized(String text, int maxSize, int overlap, String segmenter) {
+        List<String> segments = new ArrayList<>();
+        int start = 0;
+        while (start < text.length()) {
+            int end = Math.min(start + maxSize, text.length());
+            if (end < text.length() && "sentence".equals(segmenter)) {
+                int sentenceEnd = findLastSentenceBoundary(text, start, end);
+                if (sentenceEnd > start) {
+                    end = sentenceEnd + 1;
+                }
+            }
+            segments.add(text.substring(start, end));
+            start = end;
+        }
+        return segments;
+    }
+
+    /**
+     * Find the last sentence boundary position in {@code [rangeStart, rangeEnd)}.
+     * Returns -1 if no boundary is found.
+     */
+    static int findLastSentenceBoundary(String text, int rangeStart, int rangeEnd) {
+        int bound = rangeEnd - 1;
+        while (bound >= rangeStart) {
+            char c = text.charAt(bound);
+            if (c == '。' || c == '！' || c == '？' || c == '：' || c == '；'
+                    || c == '.' || c == '!' || c == '?' || c == '\n') {
+                return bound;
+            }
+            bound--;
+        }
+        return -1;
+    }
+
+    /**
      * Build a {@link ChunkResult} by optionally prepending overlap text.
      */
     private ChunkResult buildChunk(StringBuilder content, String overlapText,
                                    int index, int overlapSize) {
         String chunkContent = content.toString();
         if (!overlapText.isEmpty() && index > 0) {
-            // For chunks after the first, prepend the overlap from previous chunk
-            // But avoid duplicating if the content already starts with the overlap
             if (!chunkContent.startsWith(overlapText)) {
                 chunkContent = overlapText + chunkContent;
             }
@@ -160,9 +196,6 @@ public class TextChunker {
         return text.substring(len - overlap);
     }
 
-    /**
-     * Read an integer configuration value from the {@code kb_config} table.
-     */
     private int getConfigValue(String key, int defaultValue) {
         try {
             KbConfig config = kbConfigMapper.selectOne(
@@ -172,6 +205,15 @@ public class TextChunker {
             }
         } catch (NumberFormatException e) {
             log.warn("Invalid config value for key={}, falling back to default={}", key, defaultValue, e);
+        }
+        return defaultValue;
+    }
+
+    private String getConfigString(String key, String defaultValue) {
+        KbConfig config = kbConfigMapper.selectOne(
+                Wrappers.<KbConfig>lambdaQuery().eq(KbConfig::getConfigKey, key));
+        if (config != null && config.getConfigValue() != null && !config.getConfigValue().isBlank()) {
+            return config.getConfigValue().strip();
         }
         return defaultValue;
     }

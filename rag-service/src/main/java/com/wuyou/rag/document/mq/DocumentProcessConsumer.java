@@ -95,7 +95,7 @@ public class DocumentProcessConsumer {
             List<float[]> vectors = embeddingService.embed(contents);
 
             // Batch insert vectors to Milvus
-            vectorService.insertVectors(chunkIds, vectors);
+            vectorService.insertVectors(chunkIds, vectors, document.getKbId());
             log.info("Vectors inserted to Milvus: docId={}, vectorCount={}", docId, chunkIds.size());
 
             // Index chunks to ES

@@ -23,7 +23,7 @@ public class PdfParser implements DocumentParser {
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true);
             String text = stripper.getText(document);
-            return normalizeWhitespace(text);
+            return TextNormalizer.normalizeWhitespace(text);
         } catch (IOException e) {
             log.error("Failed to parse PDF file: {}", filename, e);
             throw new RuntimeException("PDF parsing failed: " + filename, e);
@@ -33,18 +33,5 @@ public class PdfParser implements DocumentParser {
     @Override
     public String supportedType() {
         return SUPPORTED_TYPE;
-    }
-
-    /**
-     * Collapse multiple blank lines and trim leading/trailing whitespace.
-     */
-    private String normalizeWhitespace(String text) {
-        if (text == null || text.isEmpty()) {
-            return "";
-        }
-        return text.replaceAll("[\\t\\r]+", "")
-                .replaceAll("[ \\t]+", " ")
-                .replaceAll("\\n{3,}", "\n\n")
-                .strip();
     }
 }

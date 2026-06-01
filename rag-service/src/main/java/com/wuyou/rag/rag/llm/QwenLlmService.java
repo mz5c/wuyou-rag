@@ -14,10 +14,15 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -87,6 +92,79 @@ public class QwenLlmService implements LlmService {
         }
 
         throw new BizException(ErrorCode.LLM_CIRCUIT_BROKEN, "LLM返回为空");
+    }
+
+    /**
+     * Stream chat completion via SSE. Tokens are delivered to {@code onToken},
+     * then {@code onComplete} is called with the final result (including reasoning content).
+     */
+    public void streamChat(List<Message> messages,
+                           Consumer<String> onToken,
+                           Consumer<ChatResult> onComplete,
+                           Consumer<Throwable> onError) {
+        JSONArray messagesArray = new JSONArray();
+        for (Message msg : messages) {
+            JSONObject msgObj = new JSONObject();
+            msgObj.put("role", msg.role());
+            msgObj.put("content", msg.content());
+            messagesArray.add(msgObj);
+        }
+
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("model", llmModelName);
+        requestBody.put("messages", messagesArray);
+        requestBody.put("stream", true);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + llmApiKey);
+
+        HttpEntity<String> entity = new HttpEntity<>(requestBody.toJSONString(), headers);
+
+        try {
+            restTemplate.execute(llmApiUrl, org.springframework.http.HttpMethod.POST,
+                    request -> {
+                        request.getHeaders().putAll(headers);
+                        request.getBody().write(entity.getBody().getBytes(StandardCharsets.UTF_8));
+                    },
+                    response -> {
+                        StringBuilder fullContent = new StringBuilder();
+                        try (BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (line.startsWith("data: ")) {
+                                    String data = line.substring(6).trim();
+                                    if ("[DONE]".equals(data)) {
+                                        continue;
+                                    }
+                                    try {
+                                        JSONObject json = JSONObject.parseObject(data);
+                                        JSONArray choices = json.getJSONArray("choices");
+                                        if (choices != null && !choices.isEmpty()) {
+                                            JSONObject delta = choices.getJSONObject(0).getJSONObject("delta");
+                                            if (delta != null) {
+                                                String content = delta.getString("content");
+                                                if (content != null && !content.isEmpty()) {
+                                                    fullContent.append(content);
+                                                    onToken.accept(content);
+                                                }
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        log.warn("Failed to parse streaming chunk: {}", line, e);
+                                    }
+                                }
+                            }
+                        }
+                        ChatResult result = parseReasoningContent(fullContent.toString());
+                        onComplete.accept(result);
+                        return null;
+                    });
+        } catch (Exception e) {
+            log.error("LLM streaming call failed", e);
+            onError.accept(e);
+        }
     }
 
     ChatResult parseReasoningContent(String rawResponse) {

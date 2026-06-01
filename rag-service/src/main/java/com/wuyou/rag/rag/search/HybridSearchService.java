@@ -8,6 +8,7 @@ import com.wuyou.rag.mapper.KbChunkMapper;
 import com.wuyou.rag.mapper.KbConfigMapper;
 import com.wuyou.rag.mapper.KbDocumentMapper;
 import com.wuyou.rag.rag.embedding.EmbeddingService;
+import com.wuyou.rag.rag.rerank.RerankerService;
 import com.wuyou.rag.rag.vector.VectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class HybridSearchService {
     private final EmbeddingService embeddingService;
     private final VectorService vectorService;
     private final EsSearchService esSearchService;
+    private final RerankerService rerankerService;
     private final KbConfigMapper kbConfigMapper;
     private final KbChunkMapper kbChunkMapper;
     private final KbDocumentMapper kbDocumentMapper;
@@ -43,7 +45,7 @@ public class HybridSearchService {
 
         if (!hybridEnabled || !esSearchService.isAvailable()) {
             // Fallback to pure vector search
-            return pureVectorSearch(question);
+            return pureVectorSearch(question, kbId);
         }
 
         int milvusTopK = getConfigInt("search.hybrid.milvus_top_k", DEFAULT_MILVUS_TOP_K);
@@ -57,7 +59,7 @@ public class HybridSearchService {
 
             // 2. Parallel search (Milvus + ES concurrently)
             CompletableFuture<List<Long>> milvusFuture = CompletableFuture.supplyAsync(
-                    () -> vectorService.search(queryVector, milvusTopK));
+                    () -> vectorService.search(queryVector, milvusTopK, kbId));
             CompletableFuture<List<EsSearchService.EsSearchHit>> esFuture = CompletableFuture.supplyAsync(
                     () -> esSearchService.search(question, kbId, esTopK));
 
@@ -65,20 +67,27 @@ public class HybridSearchService {
             List<EsSearchService.EsSearchHit> esHits = esFuture.get();
 
             // 3. RRF fusion
-            return rrfFuse(milvusChunkIds, esHits, rrfK, finalTopK);
+            List<SearchResult> results = rrfFuse(milvusChunkIds, esHits, rrfK, finalTopK);
+
+            // 4. Re-rank with cross-encoder (if enabled)
+            return rerankerService.rerank(question, results);
 
         } catch (Exception e) {
             log.warn("Hybrid search failed, falling back to pure vector search", e);
-            return pureVectorSearch(question);
+            return pureVectorSearch(question, kbId);
         }
     }
 
     private List<SearchResult> pureVectorSearch(String question) {
+        return pureVectorSearch(question, null);
+    }
+
+    private List<SearchResult> pureVectorSearch(String question, Long kbId) {
         float[] queryVector = embeddingService.embed(question);
         int topK = getConfigInt("search.hybrid.final_top_k", DEFAULT_FINAL_TOP_K);
         List<Long> chunkIds;
         try {
-            chunkIds = vectorService.search(queryVector, topK);
+            chunkIds = vectorService.search(queryVector, topK, kbId);
         } catch (Exception e) {
             log.error("Pure vector search also failed", e);
             return new ArrayList<>();

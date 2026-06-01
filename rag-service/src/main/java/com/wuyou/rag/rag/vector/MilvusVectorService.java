@@ -71,6 +71,8 @@ public class MilvusVectorService implements VectorService {
             schema.addField(AddFieldReq.builder()
                     .fieldName("chunk_id").dataType(DataType.Int64).build());
             schema.addField(AddFieldReq.builder()
+                    .fieldName("kb_id").dataType(DataType.Int64).build());
+            schema.addField(AddFieldReq.builder()
                     .fieldName("embedding").dataType(DataType.FloatVector).dimension(VECTOR_DIMENSION).build());
 
             CreateCollectionReq createReq = CreateCollectionReq.builder()
@@ -99,11 +101,12 @@ public class MilvusVectorService implements VectorService {
     }
 
     @Override
-    public void insertVectors(List<Long> chunkIds, List<float[]> embeddings) {
+    public void insertVectors(List<Long> chunkIds, List<float[]> embeddings, Long kbId) {
         List<JSONObject> rows = new ArrayList<>();
         for (int i = 0; i < chunkIds.size(); i++) {
             JSONObject row = new JSONObject();
             row.put("chunk_id", chunkIds.get(i));
+            row.put("kb_id", kbId);
             List<Float> embeddingList = new ArrayList<>(embeddings.get(i).length);
             for (float v : embeddings.get(i)) {
                 embeddingList.add(v);
@@ -117,11 +120,11 @@ public class MilvusVectorService implements VectorService {
                 .data(rows)
                 .build();
         client.insert(insertReq);
-        log.debug("Inserted {} vectors into Milvus", chunkIds.size());
+        log.debug("Inserted {} vectors into Milvus for kbId={}", chunkIds.size(), kbId);
     }
 
     @Override
-    public List<Long> search(float[] queryEmbedding, int topK) {
+    public List<Long> search(float[] queryEmbedding, int topK, Long kbId) {
         List<List<Float>> queryVectors = new ArrayList<>();
         List<Float> vector = new ArrayList<>();
         for (float v : queryEmbedding) {
@@ -132,15 +135,19 @@ public class MilvusVectorService implements VectorService {
         Map<String, Object> searchParams = new HashMap<>();
         searchParams.put("nprobe", 10);
 
-        SearchReq searchReq = SearchReq.builder()
+        SearchReq.SearchReqBuilder<?, ?> builder = SearchReq.builder()
                 .collectionName(COLLECTION_NAME)
                 .annsField("embedding")
                 .data(queryVectors)
                 .topK(topK)
                 .searchParams(searchParams)
-                .outputFields(Collections.singletonList("chunk_id"))
-                .build();
-        SearchResp searchResp = client.search(searchReq);
+                .outputFields(Collections.singletonList("chunk_id"));
+
+        if (kbId != null) {
+            builder.filter("kb_id == " + kbId);
+        }
+
+        SearchResp searchResp = client.search(builder.build());
 
         List<Long> chunkIds = new ArrayList<>();
         for (List<SearchResp.SearchResult> results : searchResp.getSearchResults()) {
